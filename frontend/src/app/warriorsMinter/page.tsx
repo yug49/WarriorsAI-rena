@@ -577,37 +577,56 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
         return '/lazered.png';
       }
       
-      // Handle 0G storage root hashes
-      if (url.startsWith('0x')) {
-        return `http://localhost:3001/download/${url}`;
+      // Handle 0G storage URLs with 0g:// prefix
+      if (url.startsWith('0g://')) {
+        const rootHash = url.replace('0g://', '');
+        return `http://localhost:3001/download/${rootHash}`;
       }
       
-      // Handle IPFS URLs
-      if (url.startsWith('ipfs://')) {
-        const hash = url.replace('ipfs://', '');
-        return `https://ipfs.io/ipfs/${hash}`;
+      // Handle 0G storage root hashes (direct root hash)
+      if (url.startsWith('0x')) {
+        return `http://localhost:3001/download/${url}`;
       }
       
       // Return as-is for HTTP URLs or local paths
       return url;
     };
 
-    // Determine if we should use regular img tag (always true for 0G storage)
-    const shouldUseRegularImg = useMemo(() => {
-      if (!src || src.trim() === '') return false;
+    // Function to determine if we should use regular img tag
+    const shouldUseRegularImg = (urlToCheck: string) => {
+      // Handle null, undefined, or empty strings
+      if (!urlToCheck || urlToCheck.trim() === '') {
+        console.log(`🖼️ shouldUseRegularImg: Empty URL, using Next.js Image`);
+        return false; // Use Next.js Image for local fallback
+      }
+      
+      // Always use regular img for 0G storage URLs with 0g:// prefix
+      if (urlToCheck.startsWith('0g://')) {
+        console.log(`🖼️ shouldUseRegularImg: 0g:// URL detected (${urlToCheck}), using regular img`);
+        return true;
+      }
       
       // Always use regular img for 0G storage root hashes
-      if (src.startsWith('0x')) return true;
+      if (urlToCheck.startsWith('0x')) {
+        console.log(`🖼️ shouldUseRegularImg: 0G root hash detected (${urlToCheck}), using regular img`);
+        return true;
+      }
       
-      // Use regular img for IPFS URLs
-      if (src.startsWith('ipfs://')) return true;
+      // Use regular img for 0G storage URLs
+      if (urlToCheck.includes('localhost:3001')) {
+        console.log(`🖼️ shouldUseRegularImg: localhost:3001 detected (${urlToCheck}), using regular img`);
+        return true;
+      }
       
-      const convertedSrc = convertImageUrl(src);
-      return convertedSrc.includes('ipfs.io') || 
-             convertedSrc.includes('dweb.link') || 
-             convertedSrc.includes('cloudflare-ipfs.com') || 
-             convertedSrc.includes('localhost:3001');
-    }, [src]);
+      // Use regular img for any URL that doesn't start with / or http
+      if (!urlToCheck.startsWith('/') && !urlToCheck.startsWith('http')) {
+        console.log(`🖼️ shouldUseRegularImg: Non-standard URL detected (${urlToCheck}), using regular img`);
+        return true;
+      }
+      
+      console.log(`🖼️ shouldUseRegularImg: Standard URL (${urlToCheck}), using Next.js Image`);
+      return false;
+    };
 
     const [imageSrc, setImageSrc] = useState(() => {
       // Convert 0G root hashes to proper URLs
@@ -616,38 +635,6 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
       return imageUrlCache.current.get(convertedSrc) || convertedSrc;
     });
     const [hasError, setHasError] = useState(false);
-    const [gatewayIndex, setGatewayIndex] = useState(0);
-    const [useRegularImg, setUseRegularImg] = useState(shouldUseRegularImg);
-
-    // IPFS gateways to try in order (for fallback)
-    const ipfsGateways = [
-      'https://ipfs.io/ipfs/',
-      'https://cloudflare-ipfs.com/ipfs/',
-      'https://dweb.link/ipfs/',
-      'https://gateway.ipfs.io/ipfs/'
-    ];
-
-    const getIpfsHash = (url: string) => {
-      if (url.includes('ipfs://')) {
-        return url.replace('ipfs://', '');
-      }
-      const match = url.match(/\/ipfs\/([^/?]+)/);
-      return match ? match[1] : null;
-    };
-
-    const tryNextGateway = useCallback(() => {
-      const hash = getIpfsHash(src);
-      if (hash && gatewayIndex < ipfsGateways.length - 1) {
-        const nextIndex = gatewayIndex + 1;
-        const nextUrl = `${ipfsGateways[nextIndex]}${hash}`;
-        console.log(`🔄 Trying next IPFS gateway: ${nextUrl}`);
-        setImageSrc(nextUrl);
-        setGatewayIndex(nextIndex);
-        setHasError(false);
-        return true;
-      }
-      return false;
-    }, [src, gatewayIndex, ipfsGateways]);
 
     useEffect(() => {
       const convertedSrc = convertImageUrl(src);
@@ -658,17 +645,12 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
         console.log(`🖼️ WarriorsImage: Using cached URL for ${src}: ${cachedUrl}`);
         setImageSrc(cachedUrl);
         setHasError(false);
-        setGatewayIndex(0);
       } else {
         console.log(`🖼️ WarriorsImage: Setting image src to: ${convertedSrc}`);
         setImageSrc(convertedSrc);
         setHasError(false);
-        setGatewayIndex(0);
       }
-      
-      // Update useRegularImg based on shouldUseRegularImg
-      setUseRegularImg(shouldUseRegularImg);
-    }, [src, shouldUseRegularImg]);
+    }, [src]);
 
     const handleError = useCallback(() => {
       if (!hasError) {
@@ -677,22 +659,15 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
           console.log(`🖼️ 0G Storage failed for: ${src}, falling back to lazered.png`);
           setImageSrc('/lazered.png');
           setHasError(true);
-          setUseRegularImg(false); // Use Next.js Image for local fallback
           return;
         }
         
-        // Try next IPFS gateway first
-        if (tryNextGateway()) {
-          return;
-        }
-        
-        // All gateways failed, use fallback
-        console.log(`🖼️ All IPFS gateways failed for: ${src}, falling back to lazered.png`);
+        // For any other failed URL, use fallback
+        console.log(`🖼️ Image failed for: ${src}, falling back to lazered.png`);
         setImageSrc('/lazered.png');
         setHasError(true);
-        setUseRegularImg(false); // Use Next.js Image for local fallback
       }
-    }, [imageSrc, hasError, tryNextGateway, src]);
+    }, [imageSrc, hasError, src]);
 
     const handleLoad = useCallback(() => {
       // Cache the successful URL for future use
@@ -703,10 +678,30 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
       }
     }, [src, imageSrc, hasError]);
 
+    // Determine at render time whether to use regular img
+    const useRegularImg = shouldUseRegularImg(imageSrc);
+    
+    console.log(`🖼️ WarriorsImage render: src=${src}, imageSrc=${imageSrc}, useRegularImg=${useRegularImg}`);
+
     if (useRegularImg) {
       return (
         <img 
           src={imageSrc}
+          alt={alt}
+          className={className}
+          onError={handleError}
+          onLoad={handleLoad}
+          style={{ objectFit: 'cover' }}
+        />
+      );
+    }
+
+    // Safety check: if imageSrc is not a valid URL for Next.js Image, use regular img as fallback
+    if (!imageSrc || !imageSrc.startsWith('/') && !imageSrc.startsWith('http')) {
+      console.log(`🖼️ WarriorsImage safety fallback: Invalid URL for Next.js Image (${imageSrc}), using regular img`);
+      return (
+        <img 
+          src={imageSrc || '/lazered.png'}
           alt={alt}
           className={className}
           onError={handleError}
@@ -776,7 +771,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
             : '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.3)'
         }}
       >
-      <div className="w-full h-64 mb-4 border-2 border-orange-600 rounded-2xl overflow-hidden relative">
+      <div className="w-64 h-64 mb-4 border-2 border-orange-600 rounded-2xl overflow-hidden relative mx-auto">
         <WarriorsImage 
           src={warriors.image} 
           alt={warriors.name}
