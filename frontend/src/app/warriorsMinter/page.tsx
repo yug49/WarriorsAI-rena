@@ -319,7 +319,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     }
   };
 
-  // Mint Warriors NFT function - uploads image and creates JSON metadata on IPFS
+  // Mint Warriors NFT function - uploads image and creates JSON metadata on 0G Storage
   const handleMintWarriorsNFT = async () => {
     if (!formData.image || !formData.name || !formData.bio || !formData.life_history || !formData.adjectives || !formData.knowledge_areas) {
       console.error('All form fields must be filled before minting');
@@ -330,8 +330,8 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     console.log('Starting Warriors NFT minting process...');
 
     try {
-      // Upload image and create JSON metadata on IPFS
-      console.log('Uploading warrior data to IPFS...');
+      // Upload image and create JSON metadata on 0G Storage
+      console.log('🚀 Uploading warrior data to 0G Storage...');
       const uploadResult = await ipfsService.uploadWarriorsNFT({
         name: formData.name,
         bio: formData.bio,
@@ -341,33 +341,44 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
         image: formData.image
       });
       
-      // Store the metadata CID for future use (this will be used for NFT minting)
-      setIpfsCid(uploadResult.metadataCid);
+      // Store the metadata root hash for future use (this will be used for NFT minting)
+      setIpfsCid(uploadResult.metadataRootHash);
       
-      console.log('=== WARRIORS NFT UPLOAD COMPLETE ===');
-      console.log('Image CID:', uploadResult.imageCid);
-      console.log('Metadata CID:', uploadResult.metadataCid);
-      console.log('Image URL:', uploadResult.imageUrl);
-      console.log('Metadata URL:', uploadResult.metadataUrl);
-      console.log('Generated Metadata:', uploadResult.metadata);
+      console.log('🎯 === WARRIORS NFT UPLOAD COMPLETE ===');
+      console.log('📷 Image Root Hash:', uploadResult.imageRootHash);
+      console.log('📋 Metadata Root Hash:', uploadResult.metadataRootHash);
+      console.log('🔗 Image Transaction Hash:', uploadResult.imageTransactionHash);
+      console.log('🔗 Metadata Transaction Hash:', uploadResult.metadataTransactionHash);
+      console.log('📄 Generated Metadata:', uploadResult.metadata);
       console.log('===================================');
 
-      // Step 2: Mint NFT on blockchain using the metadata CID
-      const tokenURI = `ipfs://${uploadResult.metadataCid}`;
-      console.log('Minting NFT with tokenURI:', tokenURI);
+      // Step 2: Mint NFT on blockchain using the metadata root hash
+      const encryptedURI = uploadResult.metadataRootHash; // 0G root hash
+      const metadataHash = `0x${Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(uploadResult.metadata)))))
+        .map(b => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`;
       
-      writeContract({
-        address: chainsToContracts[545].warriorsNFT as `0x${string}`,
-        abi: warriorsNFTAbi,
-        functionName: 'mintNft',
-        args: [tokenURI],
-      });
-
-      console.log('NFT minting transaction initiated...');
+      console.log('🎯 Minting NFT with parameters:');
+      console.log('📋 Encrypted URI (0G Root Hash):', encryptedURI);
+      console.log('🔐 Metadata Hash:', metadataHash);
+      
+      // Step 3: Call contract to mint NFT
+      try {
+        writeContract({
+          address: chainsToContracts[545].warriorsNFT as `0x${string}`,
+          abi: warriorsNFTAbi,
+          functionName: 'mintNft',
+          args: [encryptedURI, metadataHash],
+        });
+        
+        console.log('🔄 NFT minting transaction sent! Waiting for confirmation...');
+      } catch (contractError) {
+        console.error('❌ Contract call failed:', contractError);
+        throw new Error(`Contract minting failed: ${contractError instanceof Error ? contractError.message : 'Unknown error'}`);
+      }
       
     } catch (error) {
-      console.error('Failed to upload Warriors NFT to IPFS:', error);
-      // TODO: Add user-friendly error message
+      console.error('Failed to mint Warriors NFT:', error);
+      alert(`❌ Minting failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsMinting(false);
     }
@@ -559,20 +570,61 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
 
   // Custom image component with fallback
   const WarriorsImage = memo(({ src, alt, className }: { src: string; alt: string; className: string }) => {
+    // Helper function to convert image URLs
+    const convertImageUrl = (url: string) => {
+      // Handle null, undefined, or empty strings
+      if (!url || url.trim() === '') {
+        return '/lazered.png';
+      }
+      
+      // Handle 0G storage root hashes
+      if (url.startsWith('0x')) {
+        return `http://localhost:3001/download/${url}`;
+      }
+      
+      // Handle IPFS URLs
+      if (url.startsWith('ipfs://')) {
+        const hash = url.replace('ipfs://', '');
+        return `https://ipfs.io/ipfs/${hash}`;
+      }
+      
+      // Return as-is for HTTP URLs or local paths
+      return url;
+    };
+
+    // Determine if we should use regular img tag (always true for 0G storage)
+    const shouldUseRegularImg = useMemo(() => {
+      if (!src || src.trim() === '') return false;
+      
+      // Always use regular img for 0G storage root hashes
+      if (src.startsWith('0x')) return true;
+      
+      // Use regular img for IPFS URLs
+      if (src.startsWith('ipfs://')) return true;
+      
+      const convertedSrc = convertImageUrl(src);
+      return convertedSrc.includes('ipfs.io') || 
+             convertedSrc.includes('dweb.link') || 
+             convertedSrc.includes('cloudflare-ipfs.com') || 
+             convertedSrc.includes('localhost:3001');
+    }, [src]);
+
     const [imageSrc, setImageSrc] = useState(() => {
+      // Convert 0G root hashes to proper URLs
+      const convertedSrc = convertImageUrl(src);
       // Check if we have a cached working URL for this image
-      return imageUrlCache.current.get(src) || src;
+      return imageUrlCache.current.get(convertedSrc) || convertedSrc;
     });
     const [hasError, setHasError] = useState(false);
-    const [useRegularImg, setUseRegularImg] = useState(false);
     const [gatewayIndex, setGatewayIndex] = useState(0);
+    const [useRegularImg, setUseRegularImg] = useState(shouldUseRegularImg);
 
-    // IPFS gateways to try in order
+    // IPFS gateways to try in order (for fallback)
     const ipfsGateways = [
       'https://ipfs.io/ipfs/',
-      'https://gateway.pinata.cloud/ipfs/',
       'https://cloudflare-ipfs.com/ipfs/',
-      'https://dweb.link/ipfs/'
+      'https://dweb.link/ipfs/',
+      'https://gateway.ipfs.io/ipfs/'
     ];
 
     const getIpfsHash = (url: string) => {
@@ -598,26 +650,37 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     }, [src, gatewayIndex, ipfsGateways]);
 
     useEffect(() => {
+      const convertedSrc = convertImageUrl(src);
+      
       // Check if we have a cached working URL for this image
-      const cachedUrl = imageUrlCache.current.get(src);
-      if (cachedUrl && cachedUrl !== src) {
+      const cachedUrl = imageUrlCache.current.get(convertedSrc);
+      if (cachedUrl && cachedUrl !== convertedSrc) {
         console.log(`🖼️ WarriorsImage: Using cached URL for ${src}: ${cachedUrl}`);
         setImageSrc(cachedUrl);
         setHasError(false);
         setGatewayIndex(0);
       } else {
-        console.log(`🖼️ WarriorsImage: Setting image src to: ${src}`);
-        setImageSrc(src);
+        console.log(`🖼️ WarriorsImage: Setting image src to: ${convertedSrc}`);
+        setImageSrc(convertedSrc);
         setHasError(false);
         setGatewayIndex(0);
       }
       
-      // Use regular img tag for IPFS URLs to avoid Next.js restrictions
-      setUseRegularImg(src.includes('ipfs.io') || src.includes('dweb.link') || src.includes('cloudflare-ipfs.com') || src.includes('gateway.pinata.cloud') || src.includes('ipfs://'));
-    }, [src]);
+      // Update useRegularImg based on shouldUseRegularImg
+      setUseRegularImg(shouldUseRegularImg);
+    }, [src, shouldUseRegularImg]);
 
     const handleError = useCallback(() => {
       if (!hasError) {
+        // For 0G storage URLs, fall back directly to placeholder
+        if (src.startsWith('0x') || imageSrc.includes('localhost:3001')) {
+          console.log(`🖼️ 0G Storage failed for: ${src}, falling back to lazered.png`);
+          setImageSrc('/lazered.png');
+          setHasError(true);
+          setUseRegularImg(false); // Use Next.js Image for local fallback
+          return;
+        }
+        
         // Try next IPFS gateway first
         if (tryNextGateway()) {
           return;
@@ -633,9 +696,10 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
 
     const handleLoad = useCallback(() => {
       // Cache the successful URL for future use
-      if (imageSrc !== src && !hasError) {
+      const convertedSrc = convertImageUrl(src);
+      if (imageSrc !== convertedSrc && !hasError) {
         console.log(`🖼️ Caching successful URL for ${src}: ${imageSrc}`);
-        imageUrlCache.current.set(src, imageSrc);
+        imageUrlCache.current.set(convertedSrc, imageSrc);
       }
     }, [src, imageSrc, hasError]);
 
@@ -1363,29 +1427,21 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                       borderRadius: '12px'
                     }}
                   >
-                    {isMinting ? 'UPLOADING TO IPFS...' : (!isFormComplete ? 'COMPLETE ALL FIELDS' : 'MINT WARRIORS NFT')}
+                    {isMinting ? 'UPLOADING TO 0G STORAGE...' : (!isFormComplete ? 'COMPLETE ALL FIELDS' : 'MINT WARRIORS NFT')}
                   </button>
                   
-                  {/* Display CID if NFT data uploaded */}
+                  {/* Display Root Hash if NFT data uploaded */}
                   {ipfsCid && (
                     <div className="mt-4 p-3 bg-green-900/30 border border-green-500 rounded-lg">
                       <p className="text-green-400 text-xs mb-2" style={{fontFamily: 'Press Start 2P, monospace'}}>
-                        WARRIORS NFT METADATA UPLOADED TO IPFS
+                        WARRIORS NFT METADATA UPLOADED TO 0G STORAGE
                       </p>
                       <p className="text-green-300 text-xs break-all mb-1">
-                        METADATA CID: {ipfsCid}
+                        METADATA ROOT HASH: {ipfsCid}
                       </p>
                       <p className="text-yellow-300 text-xs mb-2" style={{fontFamily: 'Press Start 2P, monospace'}}>
-                        ✅ IMAGE + JSON METADATA STORED ON IPFS
+                        ✅ IMAGE + JSON METADATA STORED ON 0G STORAGE
                       </p>
-                      <a 
-                        href={`https://${process.env.NEXT_PUBLIC_GATEWAY_URL || 'gateway.pinata.cloud'}/ipfs/${ipfsCid}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 text-xs underline block mt-2"
-                      >
-                        View Metadata JSON on IPFS Gateway
-                      </a>
                     </div>
                   )}
                 </div>
@@ -1418,7 +1474,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                   <button
                     onClick={() => {
                       clearCache();
-                      alert('IPFS metadata cache cleared! Refresh will reload all NFT data.');
+                      alert('0G Storage metadata cache cleared! Refresh will reload all NFT data.');
                     }}
                     className="px-4 py-2 bg-purple-600 border border-purple-400 text-purple-200 text-xs rounded-lg hover:bg-purple-700 transition-colors"
                     style={{fontFamily: 'Press Start 2P, monospace'}}
@@ -1474,7 +1530,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                     className="text-gray-400 text-xs"
                     style={{fontFamily: 'Press Start 2P, monospace'}}
                   >
-                    FETCHING DATA FROM BLOCKCHAIN & IPFS...
+                    FETCHING DATA FROM BLOCKCHAIN & 0G STORAGE...
                   </p>
                   <p 
                     className="text-blue-400 text-xs mt-2"

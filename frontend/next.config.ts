@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3001',
+        pathname: '/download/**',
+      },
+      {
         protocol: 'https',
         hostname: 'ipfs.io',
         port: '',
@@ -23,7 +29,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'gateway.pinata.cloud',
+        hostname: 'gateway.ipfs.io',
         port: '',
         pathname: '/ipfs/**',
       },

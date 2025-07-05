@@ -14,7 +14,7 @@ const upload = multer({ dest: 'uploads/' });
 
 // Constants from environment variables
 const RPC_URL = process.env.RPC_URL || 'https://evmrpc-testnet.0g.ai/';
-const INDEXER_RPC = process.env.INDEXER_RPC || 'https://indexer-storage-testnet-standard.0g.ai';
+const INDEXER_RPC = process.env.INDEXER_RPC || 'https://indexer-storage-testnet-turbo.0g.ai';
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 if (!PRIVATE_KEY) {
@@ -44,22 +44,72 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       throw new Error(`Error generating Merkle tree: ${treeErr}`);
     }
 
-    // Upload file with new API syntax
-    const [tx, uploadErr] = await indexer.upload(zgFile, RPC_URL, signer);
+    const rootHash = tree?.rootHash() ?? '';
+    console.log(`📁 File prepared: ${req.file.originalname} (${req.file.size} bytes)`);
+    console.log(`🔑 Root Hash: ${rootHash}`);
 
-    if (uploadErr !== null) {
-      throw new Error(`Upload error: ${uploadErr}`);
+    try {
+      // Upload file with new API syntax
+      const [tx, uploadErr] = await indexer.upload(zgFile, RPC_URL, signer);
+
+      if (uploadErr !== null) {
+        // Check if error is due to data already existing
+        if (uploadErr.toString().includes('Data already exists')) {
+          console.log(`✅ File already exists in 0G storage with root hash: ${rootHash}`);
+          
+          // Clean up the temporary file
+          await zgFile.close();
+          
+          // Return success with existing root hash
+          res.json({
+            rootHash: rootHash,
+            transactionHash: 'existing', // Indicate this was already stored
+            message: 'File already exists in 0G storage'
+          });
+          return;
+        } else {
+          throw new Error(`Upload error: ${uploadErr}`);
+        }
+      }
+
+      console.log(`✅ File uploaded successfully to 0G storage`);
+      console.log(`📝 Transaction Hash: ${tx}`);
+
+      await zgFile.close();
+
+      res.json({
+        rootHash: rootHash,
+        transactionHash: tx,
+        message: 'File uploaded successfully'
+      });
+
+    } catch (uploadError) {
+      // Handle upload errors, including "Data already exists"
+      if (uploadError instanceof Error && uploadError.message.includes('Data already exists')) {
+        console.log(`✅ File already exists in 0G storage with root hash: ${rootHash}`);
+        
+        await zgFile.close();
+        
+        res.json({
+          rootHash: rootHash,
+          transactionHash: 'existing',
+          message: 'File already exists in 0G storage'
+        });
+        return;
+      }
+      
+      // Re-throw other errors
+      throw uploadError;
     }
 
-    await zgFile.close();
-
-    res.json({
-      rootHash: tree?.rootHash() ?? '',
-      transactionHash: tx
-    });
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('❌ Upload error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+  } finally {
+    // Clean up temporary file
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
   }
 });
 
@@ -105,5 +155,7 @@ app.get('/download/:rootHash', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 0G Storage Server running on port ${PORT}`);
+  console.log(`📡 RPC URL: ${RPC_URL}`);
+  console.log(`🔍 Indexer RPC: ${INDEXER_RPC}`);
 });

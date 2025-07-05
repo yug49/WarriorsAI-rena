@@ -1,12 +1,3 @@
-export interface IPFSUploadResult {
-  imageCid: string;
-  imageUrl: string;
-  metadataCid: string;
-  metadataUrl: string;
-  metadata: any;
-  size: number;
-}
-
 export interface WarriorsFormData {
   name: string;
   bio: string;
@@ -16,10 +7,23 @@ export interface WarriorsFormData {
   image: File;
 }
 
-export class IPFSService {
-  async uploadWarriorsNFT(formData: WarriorsFormData): Promise<IPFSUploadResult> {
-    console.log('Uploading Warriors NFT to IPFS via Pinata SDK:', formData.image.name, `(${(formData.image.size / 1024 / 1024).toFixed(2)} MB)`);
+export interface WarriorsUploadResult {
+  imageRootHash: string;
+  imageTransactionHash: string;
+  metadataRootHash: string;
+  metadataTransactionHash: string;
+  metadata: any;
+  size: number;
+  // Legacy compatibility fields
+  imageCid: string;
+  metadataCid: string;
+  imageUrl: string;
+  metadataUrl: string;
+}
 
+export class IPFSService {
+  // Upload Warriors NFT data to 0G Storage
+  async uploadWarriorsNFT(formData: WarriorsFormData): Promise<WarriorsUploadResult> {
     // Validate file before upload
     const validation = IPFSService.validateImageFile(formData.image);
     if (!validation.valid) {
@@ -52,26 +56,31 @@ export class IPFSService {
         throw new Error('Upload failed: ' + (result.error || 'Unknown error'));
       }
 
-      console.log('=== WARRIORS NFT UPLOAD SUCCESS ===');
-      console.log('Image CID:', result.imageCid);
-      console.log('Image URL:', result.imageUrl);
-      console.log('Metadata CID:', result.metadataCid);
-      console.log('Metadata URL:', result.metadataUrl);
-      console.log('Generated Metadata:', result.metadata);
+      console.log('🎯 === WARRIORS NFT UPLOAD SUCCESS ===');
+      console.log('📷 Image Root Hash:', result.imageRootHash);
+      console.log('📋 Metadata Root Hash:', result.metadataRootHash);
+      console.log('🔗 Image Transaction Hash:', result.imageTransactionHash);
+      console.log('🔗 Metadata Transaction Hash:', result.metadataTransactionHash);
+      console.log('📄 Generated Metadata:', result.metadata);
       console.log('================================');
 
       return {
-        imageCid: result.imageCid,
-        imageUrl: result.imageUrl,
-        metadataCid: result.metadataCid,
-        metadataUrl: result.metadataUrl,
+        imageRootHash: result.imageRootHash,
+        imageTransactionHash: result.imageTransactionHash,
+        metadataRootHash: result.metadataRootHash,
+        metadataTransactionHash: result.metadataTransactionHash,
         metadata: result.metadata,
-        size: result.size
+        size: result.size,
+        // Legacy compatibility fields
+        imageCid: result.imageRootHash, // Using root hash as CID for backward compatibility
+        metadataCid: result.metadataRootHash, // Using root hash as CID for backward compatibility
+        imageUrl: result.imageUrl,
+        metadataUrl: result.metadataUrl
       };
 
     } catch (error) {
-      console.error('Error uploading Warriors NFT to IPFS:', error);
-      throw new Error(`IPFS upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('❌ Error uploading Warriors NFT to 0G Storage:', error);
+      throw new Error(`0G Storage upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -88,15 +97,15 @@ export class IPFSService {
     
     const result = await this.uploadWarriorsNFT(formData);
     return {
-      cid: result.imageCid,
+      cid: result.imageRootHash, // Using root hash as CID
       url: result.imageUrl,
       size: result.size
     };
   }
 
-  // Helper method to get gateway URL from CID
-  static getGatewayUrl(cid: string): string {
-    return `https://gateway.pinata.cloud/ipfs/${cid}`;
+  // Helper method to get 0G Storage URL from root hash
+  static get0GStorageUrl(rootHash: string): string {
+    return `0g://${rootHash}`;
   }
 
   // Helper method to validate image file
@@ -107,14 +116,14 @@ export class IPFSService {
     if (!allowedTypes.includes(file.type)) {
       return {
         valid: false,
-        error: 'Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.'
+        error: `Invalid file type. Allowed types: ${allowedTypes.join(', ')}`
       };
     }
 
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: 'File too large. Please upload an image smaller than 10MB.'
+        error: `File size too large. Maximum size: ${maxSize / 1024 / 1024}MB`
       };
     }
 
@@ -122,5 +131,4 @@ export class IPFSService {
   }
 }
 
-// Export singleton instance
 export const ipfsService = new IPFSService();

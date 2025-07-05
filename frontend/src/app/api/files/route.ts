@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { pinata } from "@/utils/config"
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,53 +16,97 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file received" }, { status: 400 });
     }
 
-    console.log("Uploading file to Pinata:", file.name, "(" + (file.size / 1024 / 1024).toFixed(2) + " MB)");
+    console.log("🚀 Uploading file to 0G Storage:", file.name, "(" + (file.size / 1024 / 1024).toFixed(2) + " MB)");
     
-    // Step 1: Upload image to Pinata IPFS
-    const { cid: imageCid } = await pinata.upload.public.file(file);
-    console.log("Image uploaded successfully. CID:", imageCid);
+    // Step 1: Upload image to 0G Storage
+    const imageFormData = new FormData();
+    imageFormData.append('file', file);
     
-    // Step 2: Create JSON metadata
+    const imageUploadResponse = await fetch('http://localhost:3001/upload', {
+      method: 'POST',
+      body: imageFormData,
+    });
+    
+    if (!imageUploadResponse.ok) {
+      throw new Error(`Image upload failed: ${imageUploadResponse.statusText}`);
+    }
+    
+    const imageResult = await imageUploadResponse.json();
+    const imageRootHash = imageResult.rootHash;
+    const imageTransactionHash = imageResult.transactionHash;
+    
+    console.log("✅ Image uploaded successfully to 0G Storage!");
+    console.log("📷 Image Root Hash:", imageRootHash);
+    console.log("📝 Image Transaction Hash:", imageTransactionHash);
+    
+    // Step 2: Create JSON metadata with 0G Storage image reference
     const metadata = {
       name: name || "Unknown Warrior",
       bio: bio || "A legendary warrior",
       life_history: life_history || "History unknown",
       personality: adjectives ? adjectives.split(', ').map(trait => trait.trim()) : ["Brave", "Skilled"],
       knowledge_areas: knowledge_areas ? knowledge_areas.split(', ').map(area => area.trim()) : ["Combat", "Strategy"],
-      image: "ipfs://" + imageCid
+      image: `0g://${imageRootHash}`, // Using 0G storage reference
+      image_root_hash: imageRootHash, // Store the root hash for direct access
+      image_transaction_hash: imageTransactionHash
     };
     
-    console.log("Created metadata JSON:", metadata);
+    console.log("📋 Created metadata JSON:", metadata);
     
-    // Step 3: Upload JSON metadata to IPFS
-    const { cid: metadataCid } = await pinata.upload.public.json(metadata);
-    console.log("Metadata JSON uploaded successfully. CID:", metadataCid);
+    // Step 3: Upload JSON metadata to 0G Storage
+    const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], { 
+      type: 'application/json' 
+    });
+    const metadataFile = new File([metadataBlob], 'metadata.json', { 
+      type: 'application/json' 
+    });
     
-    // Get the gateway URLs
-    const imageUrl = await pinata.gateways.public.convert(imageCid);
-    const metadataUrl = await pinata.gateways.public.convert(metadataCid);
+    const metadataFormData = new FormData();
+    metadataFormData.append('file', metadataFile);
     
-    console.log("=== IPFS UPLOAD COMPLETE ===");
-    console.log("Image CID:", imageCid);
-    console.log("Image URL:", imageUrl);
-    console.log("Metadata CID:", metadataCid);
-    console.log("Metadata URL:", metadataUrl);
-    console.log("============================");
+    const metadataUploadResponse = await fetch('http://localhost:3001/upload', {
+      method: 'POST',
+      body: metadataFormData,
+    });
+    
+    if (!metadataUploadResponse.ok) {
+      throw new Error(`Metadata upload failed: ${metadataUploadResponse.statusText}`);
+    }
+    
+    const metadataResult = await metadataUploadResponse.json();
+    const metadataRootHash = metadataResult.rootHash;
+    const metadataTransactionHash = metadataResult.transactionHash;
+    
+    console.log("✅ Metadata JSON uploaded successfully to 0G Storage!");
+    console.log("📋 Metadata Root Hash:", metadataRootHash);
+    console.log("📝 Metadata Transaction Hash:", metadataTransactionHash);
+    
+    console.log("🎯 === 0G STORAGE UPLOAD COMPLETE ===");
+    console.log("📷 Image Root Hash:", imageRootHash);
+    console.log("📋 Metadata Root Hash:", metadataRootHash);
+    console.log("🔗 Image Transaction Hash:", imageTransactionHash);
+    console.log("🔗 Metadata Transaction Hash:", metadataTransactionHash);
+    console.log("=======================================");
     
     return NextResponse.json({
       success: true,
-      imageCid: imageCid,
-      imageUrl: imageUrl,
-      metadataCid: metadataCid,
-      metadataUrl: metadataUrl,
+      imageRootHash: imageRootHash,
+      imageTransactionHash: imageTransactionHash,
+      metadataRootHash: metadataRootHash,
+      metadataTransactionHash: metadataTransactionHash,
       metadata: metadata,
-      size: file.size
+      size: file.size,
+      // Legacy compatibility fields (using root hashes as CIDs)
+      imageCid: imageRootHash,
+      metadataCid: metadataRootHash,
+      imageUrl: `0g://${imageRootHash}`,
+      metadataUrl: `0g://${metadataRootHash}`
     }, { status: 200 });
     
   } catch (e) {
-    console.error("Error uploading file:", e);
+    console.error("❌ Error uploading to 0G Storage:", e);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "0G Storage upload failed: " + (e instanceof Error ? e.message : 'Unknown error') },
       { status: 500 }
     );
   }

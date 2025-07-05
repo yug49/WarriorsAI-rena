@@ -24,8 +24,11 @@ interface UserWarriors {
   totalWinnings: number;
 }
 
-// Simple metadata cache to avoid repeated IPFS requests
+// Simple metadata cache to avoid repeated requests
 const metadataCache = new Map<string, any>();
+
+// 0G Storage service configuration
+const ZG_STORAGE_API_URL = 'http://localhost:3001';
 
 // Function to clear cache for debugging/testing
 const clearMetadataCache = () => {
@@ -33,42 +36,81 @@ const clearMetadataCache = () => {
   console.log('🗑️ Metadata cache cleared');
 };
 
-// Helper function to convert IPFS URI to fallback image URL
-const convertIpfsToProxyUrl = (ipfsUrl: string) => {
-  if (ipfsUrl.startsWith('ipfs://')) {
+// Helper function to convert IPFS URI or 0G root hash to proper image URL
+const convertIpfsToProxyUrl = (imageUrl: string) => {
+  // Handle 0G storage root hashes
+  if (imageUrl.startsWith('0x')) {
+    // Convert 0G root hash to download URL
+    return `http://localhost:3001/download/${imageUrl}`;
+  }
+  
+  // Handle IPFS URLs
+  if (imageUrl.startsWith('ipfs://')) {
     // Extract the IPFS hash from the URL
-    const hash = ipfsUrl.replace('ipfs://', '');
+    const hash = imageUrl.replace('ipfs://', '');
     // Try to use a public IPFS gateway that works with CORS
-    // If this fails, the image will fallback to the broken image handler in the browser
     return `https://ipfs.io/ipfs/${hash}`;
   }
-  return ipfsUrl;
+  
+  // Return as-is if it's already a proper HTTP URL or local path
+  return imageUrl;
 };
 
 // Helper function to add delay between requests to avoid rate limiting
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Helper function to fetch metadata from IPFS with improved error handling and rate limiting
-const fetchMetadataFromIPFS = async (tokenURI: string, tokenId?: string) => {
+/**
+ * Fetch metadata from 0G Storage using root hash
+ */
+const fetchMetadataFrom0G = async (rootHash: string, tokenId?: string): Promise<any | null> => {
+  try {
+    console.log(`🔗 Token ${tokenId || 'unknown'}: Fetching metadata from 0G Storage`);
+    console.log(`🔑 Root Hash: ${rootHash}`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
+    const response = await fetch(`${ZG_STORAGE_API_URL}/download/${rootHash}`, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`0G Storage API returned ${response.status}: ${response.statusText}`);
+    }
+    
+    const metadata = await response.json();
+    console.log(`✅ Token ${tokenId || 'unknown'}: Successfully fetched metadata from 0G Storage`);
+    
+    return metadata;
+    
+  } catch (error) {
+    console.error(`❌ Token ${tokenId || 'unknown'}: 0G Storage fetch failed:`, error instanceof Error ? error.message : 'Unknown error');
+    return null;
+  }
+};
+
+/**
+ * Fetch metadata from IPFS with improved error handling and rate limiting (legacy support)
+ */
+const fetchMetadataFromIPFS = async (tokenURI: string, tokenId?: string): Promise<any | null> => {
   if (!tokenURI.startsWith('ipfs://')) {
     console.log('Not an IPFS URL:', tokenURI);
     return null;
   }
 
-  // Check cache first
-  if (metadataCache.has(tokenURI)) {
-    console.log('📦 Using cached metadata for:', tokenURI);
-    return metadataCache.get(tokenURI);
-  }
-
   const cid = tokenURI.replace('ipfs://', '');
   
-  // Use multiple gateways with different characteristics
+  // Use multiple gateways with different characteristics (removed Pinata, using 0G instead)
   const gateways = [
     { url: 'https://ipfs.io/ipfs/', name: 'ipfs.io', timeout: 10000 },
     { url: 'https://dweb.link/ipfs/', name: 'dweb.link', timeout: 12000 },
     { url: 'https://cloudflare-ipfs.com/ipfs/', name: 'cloudflare', timeout: 10000 },
-    { url: 'https://gateway.pinata.cloud/ipfs/', name: 'pinata', timeout: 15000 },
+    { url: 'https://gateway.ipfs.io/ipfs/', name: 'gateway.ipfs.io', timeout: 10000 },
   ];
 
   // Add a small delay to prevent overwhelming the gateways
@@ -79,7 +121,7 @@ const fetchMetadataFromIPFS = async (tokenURI: string, tokenId?: string) => {
     const httpUrl = `${gateway.url}${cid}`;
     
     try {
-      console.log(`🌐 Token ${tokenId || 'unknown'}: Attempt ${i + 1}/${gateways.length} - Fetching from ${gateway.name}`);
+      console.log(`🌐 Token ${tokenId || 'unknown'}: Attempt ${i + 1}/${gateways.length} - Fetching from IPFS ${gateway.name}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), gateway.timeout);
@@ -100,57 +142,90 @@ const fetchMetadataFromIPFS = async (tokenURI: string, tokenId?: string) => {
       }
       
       const metadata = await response.json();
-      console.log(`✅ Token ${tokenId || 'unknown'}: Success with ${gateway.name}`, metadata);
+      console.log(`✅ Token ${tokenId || 'unknown'}: Success with IPFS ${gateway.name}`);
       
       // Validate metadata structure
       if (!metadata || typeof metadata !== 'object' || (!metadata.name && !metadata.title)) {
         throw new Error('Invalid metadata structure');
       }
       
-      // Cache the metadata
-      metadataCache.set(tokenURI, metadata);
       return metadata;
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.warn(`❌ Token ${tokenId || 'unknown'}: Gateway ${gateway.name} failed:`, errorMessage);
+      console.warn(`❌ Token ${tokenId || 'unknown'}: IPFS Gateway ${gateway.name} failed:`, errorMessage);
       
       // Add delay before trying next gateway to avoid rate limiting
       if (i < gateways.length - 1) {
         await delay(500); // 500ms delay between gateway attempts
       }
-      
-      // If this is the last gateway, fall back to mock data
-      if (i === gateways.length - 1) {
-        console.log(`🔄 Token ${tokenId || 'unknown'}: All IPFS gateways failed, using fallback metadata`);
-        
-        // Create more realistic fallback data based on tokenId
-        const fallbackTokenId = tokenId || cid.slice(-3);
-        const fallbackMetadata = {
-          name: `Warriors #${fallbackTokenId}`,
-          description: "A legendary warrior from the Warriors AI-rena battlefield. This metadata is temporarily using fallback data due to IPFS gateway connectivity issues.",
-          image: `ipfs://${cid}`, // Keep the original IPFS hash
-          bio: "Ancient warrior whose full history is being retrieved from the cosmic archives...",
-          life_history: "Born in the age of digital warfare, this warrior's complete saga is stored in the decentralized realm...",
-          adjectives: "Brave, Mysterious, Resilient",
-          knowledge_areas: "Combat, Strategy, Digital Warfare",
-          attributes: [
-            { trait_type: "Strength", value: Math.floor(Math.random() * 50) + 50 },
-            { trait_type: "Wit", value: Math.floor(Math.random() * 50) + 50 },
-            { trait_type: "Charisma", value: Math.floor(Math.random() * 50) + 50 },
-            { trait_type: "Defence", value: Math.floor(Math.random() * 50) + 50 },
-            { trait_type: "Luck", value: Math.floor(Math.random() * 50) + 50 },
-          ]
-        };
-        
-        // Cache the fallback metadata
-        metadataCache.set(tokenURI, fallbackMetadata);
-        return fallbackMetadata;
-      }
     }
   }
   
   return null;
+};
+
+/**
+ * Unified metadata fetching function that handles both 0G Storage and IPFS
+ */
+const fetchMetadata = async (tokenURI: string, tokenId?: string): Promise<any | null> => {
+  // Check cache first
+  if (metadataCache.has(tokenURI)) {
+    console.log(`📦 Token ${tokenId || 'unknown'}: Using cached metadata`);
+    return metadataCache.get(tokenURI);
+  }
+
+  let metadata: any | null = null;
+
+  // Check if tokenURI is a 0G root hash (starts with 0x)
+  if (tokenURI.startsWith('0x')) {
+    console.log(`🔗 Token ${tokenId || 'unknown'}: Detected 0G root hash format`);
+    metadata = await fetchMetadataFrom0G(tokenURI, tokenId);
+  } 
+  // Check if tokenURI is an IPFS CID
+  else if (tokenURI.startsWith('ipfs://') || tokenURI.includes('/ipfs/')) {
+    console.log(`🔗 Token ${tokenId || 'unknown'}: Detected IPFS format`);
+    metadata = await fetchMetadataFromIPFS(tokenURI, tokenId);
+  }
+  // Try both methods if format is unclear
+  else {
+    console.log(`🔗 Token ${tokenId || 'unknown'}: Unclear format, trying 0G first then IPFS`);
+    metadata = await fetchMetadataFrom0G(tokenURI, tokenId);
+    if (!metadata) {
+      metadata = await fetchMetadataFromIPFS(tokenURI, tokenId);
+    }
+  }
+
+  // If all methods failed, create fallback metadata
+  if (!metadata) {
+    console.log(`🔄 Token ${tokenId || 'unknown'}: All storage methods failed, using fallback metadata`);
+    
+    // Create more realistic fallback data based on tokenId
+    const fallbackTokenId = tokenId || tokenURI.slice(-3);
+    metadata = {
+      name: `Warriors #${fallbackTokenId}`,
+      description: "A legendary warrior from the Warriors AI-rena battlefield. This metadata is temporarily using fallback data due to storage connectivity issues.",
+      image: "/lazered.png", // Fallback image
+      bio: "Ancient warrior whose full history is being retrieved from the storage archives...",
+      life_history: "Born in the age of digital warfare, this warrior's complete saga is stored in the decentralized realm...",
+      adjectives: "Brave, Mysterious, Resilient",
+      knowledge_areas: "Combat, Strategy, Digital Warfare",
+      attributes: [
+        { trait_type: "Strength", value: Math.floor(Math.random() * 50) + 50 },
+        { trait_type: "Wit", value: Math.floor(Math.random() * 50) + 50 },
+        { trait_type: "Charisma", value: Math.floor(Math.random() * 50) + 50 },
+        { trait_type: "Defence", value: Math.floor(Math.random() * 50) + 50 },
+        { trait_type: "Luck", value: Math.floor(Math.random() * 50) + 50 },
+      ]
+    };
+  }
+
+  // Cache the metadata
+  if (metadata) {
+    metadataCache.set(tokenURI, metadata);
+  }
+
+  return metadata;
 };
 
 // Helper function to convert ranking enum to string
@@ -249,15 +324,15 @@ export const useUserNFTs = (isActive: boolean = false, chainId: number = 545) =>
           console.log(`🔄 Processing NFT ${index + 1}/${tokenIds.length}: Token ID ${tokenId}`);
           
           // Create parallel requests for contract data (this is fine since it's our own API)
-          const [tokenURIResponse, traitsResponse, rankingResponse, winningsResponse] = await Promise.allSettled([
-            // Get token URI
+          const [encryptedURIResponse, traitsResponse, rankingResponse, winningsResponse] = await Promise.allSettled([
+            // Get encrypted URI (where the actual 0G storage root hash is stored)
             fetch('/api/contract/read', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contractAddress: contractAddress,
                 abi: warriorsNFTAbi,
-                functionName: 'tokenURI',
+                functionName: 'getEncryptedURI',
                 args: [tokenId.toString()], // Convert BigInt to string
                 chainId: chainId
               })
@@ -328,17 +403,22 @@ export const useUserNFTs = (isActive: boolean = false, chainId: number = 545) =>
           ]);
 
           // Extract results (handling potential failures)
-          const tokenURI = tokenURIResponse.status === 'fulfilled' ? tokenURIResponse.value : null;
+          const encryptedURI = encryptedURIResponse.status === 'fulfilled' ? encryptedURIResponse.value : null;
           const contractTraits = traitsResponse.status === 'fulfilled' ? traitsResponse.value : null;
           const ranking = rankingResponse.status === 'fulfilled' ? rankingResponse.value : 0;
           const winnings = winningsResponse.status === 'fulfilled' ? winningsResponse.value : '0';
 
+          // Use encrypted URI (where the actual 0G storage root hash is stored)
+          const tokenURI = encryptedURI;
+
           // Log the responses for debugging
           console.log(`📄 Token ${tokenId} contract data loaded`);
+          console.log(`🔍 Token ${tokenId}: Encrypted URI: "${encryptedURI}"`);
+          console.log(`🎯 Token ${tokenId}: Using URI: "${tokenURI}"`);
 
           // Check for errors in responses
-          if (tokenURIResponse.status === 'rejected') {
-            console.error(`Failed to get tokenURI for ${tokenId}:`, tokenURIResponse.reason);
+          if (encryptedURIResponse.status === 'rejected') {
+            console.error(`Failed to get encryptedURI for ${tokenId}:`, encryptedURIResponse.reason);
           }
           if (traitsResponse.status === 'rejected') {
             console.error(`Failed to get traits for ${tokenId}:`, traitsResponse.reason);
@@ -350,11 +430,11 @@ export const useUserNFTs = (isActive: boolean = false, chainId: number = 545) =>
             console.error(`Failed to get winnings for ${tokenId}:`, winningsResponse.reason);
           }
 
-          // Fetch metadata from IPFS if we have a tokenURI
+          // Fetch metadata from 0G Storage or IPFS if we have a tokenURI
           let metadata = null;
           if (tokenURI) {
             console.log(`🔍 Fetching metadata for token ${tokenId} from:`, tokenURI);
-            metadata = await fetchMetadataFromIPFS(tokenURI, tokenId.toString());
+            metadata = await fetchMetadata(tokenURI, tokenId.toString());
             console.log(`📋 Metadata for token ${tokenId}:`, metadata);
           } else {
             console.warn(`⚠️ No tokenURI found for token ${tokenId}`);
