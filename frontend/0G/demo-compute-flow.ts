@@ -146,6 +146,169 @@ export async function generateWarriorAttributes(userInput: string): Promise<stri
   }
 }
 
+// Function to create traits and moves query with personality attributes
+function createTraitsAndMovesQuery(personalityAttributes: any): string {
+  const basePrompt = `Generate combat traits and moves for a warrior based on their personality attributes. 
+
+PERSONALITY ATTRIBUTES:
+Name: ${personalityAttributes.name}
+Bio: ${personalityAttributes.bio}
+Life History: ${personalityAttributes.life_history}
+Personality Traits: ${Array.isArray(personalityAttributes.personality) ? personalityAttributes.personality.join(', ') : personalityAttributes.personality}
+Knowledge Areas: ${Array.isArray(personalityAttributes.knowledge_areas) ? personalityAttributes.knowledge_areas.join(', ') : personalityAttributes.knowledge_areas}
+
+REQUIREMENTS:
+1. Generate trait values between 0-10000 based on the personality
+2. Create move names that are catchy, fitting the personality, and  dark humor
+3. Return ONLY the JSON object. No additional text, explanations, or sentences. Only pure JSON.
+4. DO NOT include any markdown code blocks, backticks, or extra formatting.
+5. DO NOT include any explanatory text before or after the JSON.
+
+EXACT OUTPUT FORMAT REQUIRED:
+{"Strength": 8241, "Wit": 5921, "Charisma": 7392, "Defence": 3519, "Luck": 4678, "strike_attack": "Galactic Smash", "taunt_attack": "Rocket Science", "dodge": "Tesla Tango", "recover": "Mars Recharge", "special_move": "PayPal Payload"}
+
+CRITICAL: Return ONLY the JSON object. NO other text, explanations, or formatting.`;
+
+  return basePrompt;
+}
+
+// New exported function for generating warrior traits and moves
+export async function generateWarriorTraitsAndMoves(personalityAttributes: any): Promise<string> {
+  console.log("🚀 Generating warrior traits and moves with 0G AI");
+  console.log(`💬 Personality Attributes:`, personalityAttributes);
+  
+  try {
+    // Step 1: Initialize wallet and provider
+    const privateKey = process.env.PRIVATE_KEY;
+    if (!privateKey) {
+      throw new Error('PRIVATE_KEY is required in .env file');
+    }
+    
+    const provider = new ethers.JsonRpcProvider("https://evmrpc-testnet.0g.ai");
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    // Step 2: Create broker instance
+    const broker = await createZGComputeNetworkBroker(wallet);
+    
+    // Step 3: Check/Setup ledger account
+    try {
+      await broker.ledger.getLedger();
+    } catch (error) {
+      console.log("⚠️  Ledger account does not exist, creating...");
+      await broker.ledger.addLedger(0.1);
+    }
+    
+    // Step 4: Select provider and acknowledge
+    const selectedProvider = OFFICIAL_PROVIDERS["llama-3.3-70b-instruct"];
+    
+    try {
+      await broker.inference.acknowledgeProviderSigner(selectedProvider);
+    } catch (error: any) {
+      if (!error.message.includes('already acknowledged')) {
+        throw error;
+      }
+    }
+    
+    // Step 5: Get service metadata
+    const { endpoint, model } = await broker.inference.getServiceMetadata(selectedProvider);
+    
+    // Step 6: Generate authentication headers
+    const query = createTraitsAndMovesQuery(personalityAttributes);
+    const headers = await broker.inference.getRequestHeaders(selectedProvider, query);
+    
+    // Step 7: Send query to AI service
+    const openai = new OpenAI({
+      baseURL: endpoint,
+      apiKey: "", // Empty string as per 0G docs
+    });
+    
+    // Prepare headers for OpenAI client
+    const requestHeaders: Record<string, string> = {};
+    Object.entries(headers).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        requestHeaders[key] = value;
+      }
+    });
+    
+    // Send the query
+    const completion = await openai.chat.completions.create(
+      {
+        messages: [{ role: "user", content: query }],
+        model: model,
+      },
+      {
+        headers: requestHeaders,
+      }
+    );
+    
+    const aiResponse = completion.choices[0].message.content;
+    const chatId = completion.id;
+    
+    console.log("✅ AI query completed successfully");
+    console.log(`🆔 Chat ID: ${chatId}`);
+    
+    // Step 8: Process response and handle payment
+    try {
+      await broker.inference.processResponse(
+        selectedProvider,
+        aiResponse || "",
+        chatId
+      );
+    } catch (paymentError: any) {
+      console.log("⚠️  Payment processing failed, but continuing...");
+    }
+    
+    // Validate and return the response
+    const trimmedResponse = (aiResponse || "").trim();
+    const isPureJSON = trimmedResponse.startsWith('{') && trimmedResponse.endsWith('}');
+    
+    if (!isPureJSON) {
+      console.log("⚠️  Response is not pure JSON format, attempting to extract JSON...");
+      // Try to extract JSON from the response
+      const jsonMatch = trimmedResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const extractedJson = jsonMatch[0];
+        console.log("✅ Extracted JSON from response");
+        return extractedJson;
+      }
+    }
+    
+    // Validate JSON structure for traits and moves
+    try {
+      const parsedResponse = JSON.parse(trimmedResponse);
+      const requiredFields = ['Strength', 'Wit', 'Charisma', 'Defence', 'Luck', 'strike_attack', 'taunt_attack', 'dodge', 'recover', 'special_move'];
+      const missingFields = requiredFields.filter(field => !parsedResponse.hasOwnProperty(field));
+      
+      if (missingFields.length === 0) {
+        console.log("✅ Response contains all required JSON fields for traits and moves");
+        
+        // Validate trait values are within range
+        const traits = ['Strength', 'Wit', 'Charisma', 'Defence', 'Luck'];
+        const invalidTraits = traits.filter(trait => {
+          const value = parsedResponse[trait];
+          return typeof value !== 'number' || value < 0 || value > 10000;
+        });
+        
+        if (invalidTraits.length === 0) {
+          console.log("✅ All trait values are within valid range (0-10000)");
+          return trimmedResponse;
+        } else {
+          throw new Error(`Invalid trait values for: ${invalidTraits.join(', ')} (must be 0-10000)`);
+        }
+      } else {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+    } catch (jsonError) {
+      console.log("❌ Response is not valid JSON format");
+      throw new Error(`Invalid JSON response: ${jsonError}`);
+    }
+    
+  } catch (error: any) {
+    console.error("❌ Failed to generate warrior traits and moves:", error.message);
+    throw error;
+  }
+}
+
 // Default user input - change this to test different subjects
 const USER_INPUT = "Albert Einstein";
 const TEST_QUERY = createQuery(USER_INPUT);

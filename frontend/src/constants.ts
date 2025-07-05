@@ -24,8 +24,8 @@ export const chainsToContracts: ContractsConfig = {
     545: {
         mockOracle: "0x56d7060B080A6d5bF77aB610600e5ab70365696A",
         crownToken: "0x9Fd6CCEE1243EaC173490323Ed6B8b8E0c15e8e6",
-        warriorsNFT: "0xef73513BC43561a60e1423B019847A2297C9e2A0",
-        ArenaFactory: "0x1b429b0745cC1cB88ad7211C2513fD0c077e47CC"
+        warriorsNFT: "0x3838510eCa30EdeF7b264499F2B590ab4ED4afB1",
+        ArenaFactory: "0xf77840febD42325F83cB93F9deaE0F8b14Eececf"
     }
 }
 

@@ -49,6 +49,24 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     console.log(`🔑 Root Hash: ${rootHash}`);
 
     try {
+      // First, check if the file already exists by trying to download it
+      try {
+        const checkErr = await indexer.download(rootHash, '/tmp/check_file', false);
+        if (checkErr === null) {
+          console.log(`✅ File already exists in 0G storage with root hash: ${rootHash}`);
+          await zgFile.close();
+          res.json({
+            rootHash: rootHash,
+            transactionHash: 'existing',
+            message: 'File already exists in 0G storage'
+          });
+          return;
+        }
+      } catch (checkError) {
+        // File doesn't exist, proceed with upload
+        console.log(`📤 File doesn't exist yet, proceeding with upload...`);
+      }
+
       // Upload file with new API syntax
       const [tx, uploadErr] = await indexer.upload(zgFile, RPC_URL, signer);
 
@@ -84,18 +102,48 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       });
 
     } catch (uploadError) {
-      // Handle upload errors, including "Data already exists"
-      if (uploadError instanceof Error && uploadError.message.includes('Data already exists')) {
-        console.log(`✅ File already exists in 0G storage with root hash: ${rootHash}`);
+      // Handle upload errors gracefully
+      if (uploadError instanceof Error) {
+        const errorMessage = uploadError.message.toLowerCase();
         
-        await zgFile.close();
+        if (errorMessage.includes('data already exists') || 
+            errorMessage.includes('file already exists')) {
+          console.log(`✅ File already exists in 0G storage with root hash: ${rootHash}`);
+          
+          await zgFile.close();
+          
+          res.json({
+            rootHash: rootHash,
+            transactionHash: 'existing',
+            message: 'File already exists in 0G storage'
+          });
+          return;
+        }
         
-        res.json({
-          rootHash: rootHash,
-          transactionHash: 'existing',
-          message: 'File already exists in 0G storage'
-        });
-        return;
+        // For transaction execution reverts, check if the data is now available
+        if (errorMessage.includes('transaction execution reverted') || 
+            errorMessage.includes('failed to submit transaction')) {
+          console.log(`⚠️ Transaction failed, but checking if data is now available...`);
+          
+          // Wait a bit and try to download the file to see if it exists
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          try {
+            const checkErr = await indexer.download(rootHash, '/tmp/check_after_fail', false);
+            if (checkErr === null) {
+              console.log(`✅ File is now available in 0G storage despite transaction failure: ${rootHash}`);
+              await zgFile.close();
+              res.json({
+                rootHash: rootHash,
+                transactionHash: 'eventual_success',
+                message: 'File is available in 0G storage (eventual consistency)'
+              });
+              return;
+            }
+          } catch (recheckError) {
+            console.log(`❌ File still not available after transaction failure`);
+          }
+        }
       }
       
       // Re-throw other errors

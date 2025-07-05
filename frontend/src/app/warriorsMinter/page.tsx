@@ -8,8 +8,8 @@ import ReactCrop, { Crop, PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import '../home-glass.css';
 // import { generateWarriorAttributes } from '../../../0G/demo-compute-flow'; // Moved to API route
-import { nearWalletService } from '../../services/nearWallet';
-// import { warriorsActivationService } from '../../services/warriorsActivation';
+
+
 import { gameMasterSigningService } from '../../services/gameMasterSigning';
 import { ipfsService } from '../../services/ipfsService';
 import { chainsToContracts, warriorsNFTAbi } from '../../constants';
@@ -53,8 +53,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedWarriors, setSelectedWarriors] = useState<UserWarriors | null>(null);
   const [activeSection, setActiveSection] = useState<'create' | 'manage' | 'ai'>('create');
-  const [nearWalletConnected, setNearWalletConnected] = useState(false);
-  const [nearAccountId, setNearAccountId] = useState<string | null>(null);
+
   const [isMinting, setIsMinting] = useState(false);
   const [ipfsCid, setIpfsCid] = useState<string | null>(null);
 
@@ -88,58 +87,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
   // Custom hook to manage user NFTs
   const { userNFTs, isLoadingNFTs, hasError: tokenIdsError, clearCache, debugState } = useUserNFTs(activeSection === 'manage', chainId);
 
-  // Check NEAR wallet connection status
-  const checkNearWalletConnection = useCallback(() => {
-    const connected = nearWalletService.isConnected();
-    const accountId = nearWalletService.getAccountId();
-    setNearWalletConnected(connected);
-    setNearAccountId(accountId);
-  }, []);
 
-  // Connect to NEAR wallet
-  const connectNearWallet = useCallback(async () => {
-    try {
-      await nearWalletService.connectWallet();
-      checkNearWalletConnection();
-    } catch (error) {
-      console.error("Failed to connect NEAR wallet:", error);
-    }
-  }, [checkNearWalletConnection]);
-
-  // Connect to Meteor wallet specifically
-  const connectMeteorWallet = useCallback(async () => {
-    try {
-      await nearWalletService.connectWallet('meteor-wallet');
-      checkNearWalletConnection();
-    } catch (error) {
-      console.error("Failed to connect Meteor wallet:", error);
-    }
-  }, [checkNearWalletConnection]);
-
-  // Connect to HOT wallet specifically
-  const connectHotWallet = useCallback(async () => {
-    try {
-      await nearWalletService.connectWallet('here-wallet');
-      checkNearWalletConnection();
-    } catch (error) {
-      console.error("Failed to connect HOT wallet:", error);
-    }
-  }, [checkNearWalletConnection]);
-
-  // Disconnect NEAR wallet
-  const disconnectNearWallet = useCallback(async () => {
-    try {
-      await nearWalletService.disconnectWallet();
-      checkNearWalletConnection();
-    } catch (error) {
-      console.error("Failed to disconnect NEAR wallet:", error);
-    }
-  }, [checkNearWalletConnection]);
-
-  // Check wallet connection on component mount
-  useEffect(() => {
-    checkNearWalletConnection();
-  }, [checkNearWalletConnection]);
 
   // Handle transaction confirmation and display success message
   useEffect(() => {
@@ -419,30 +367,15 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     setSelectedWarriors(null);
   };
 
-  // Handle Warriors activation using NEAR AI with wallet signature
+  // Handle Warriors activation using 0G AI
   const handleActivateWarriors = async (warriors: UserWarriors) => {
     if (!warriors) return;
 
     setIsActivating(true);
     
     try {
-      // First, get wallet signature for NEAR AI authentication (this also handles connection)
-      console.log('Getting wallet signature for NEAR AI authentication...');
-      
-      let signedAuth;
-      try {
-        // Use the same login method as the generate attributes function
-        signedAuth = await nearWalletService.login();
-        console.log('Got wallet signature:', signedAuth);
-      } catch (signError) {
-        console.error('Failed to get wallet signature:', signError);
-        alert('Please sign the message to authenticate with NEAR AI');
-        setIsActivating(false);
-        return;
-      }
-
-      // Create a JSON similar to the traitsGenerator.json format
-      const warriorsJson = {
+      // Create personality attributes object from warriors data
+      const personalityAttributes = {
         name: warriors.name,
         bio: warriors.bio,
         life_history: warriors.life_history,
@@ -450,85 +383,93 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
         knowledge_areas: warriors.knowledge_areas || "Combat, Strategy, Leadership"
       };
 
-      console.log("Created Warriors JSON for activation:", warriorsJson);
+      console.log("Created Warriors personality attributes for activation:", personalityAttributes);
       
-      // Call the activation service with wallet-signed auth
-      console.log(`Activating ${warriors.name} using NEAR AI traits generator...`);
+      // Call the 0G AI service via API route
+      console.log(`Activating ${warriors.name} using 0G AI traits generator...`);
       
-      // Convert auth to the format expected by the activation service
-      const authForApi = {
-        signature: signedAuth.signature,
-        accountId: signedAuth.accountId,
-        publicKey: signedAuth.publicKey,
-        message: signedAuth.message,
-        nonce: signedAuth.nonce.toString('base64'), // Convert Buffer to base64 string
-        recipient: signedAuth.recipient,
-        callbackUrl: signedAuth.callbackUrl
-      };
+      const apiResponse = await fetch('/api/generate-warrior-traits-moves', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ personalityAttributes }),
+      });
       
-      // const response = await warriorsActivationService.activateWarriors(warriorsJson, authForApi);
-      const response = "Activation service temporarily disabled - 0G AI integration in progress";
+      const apiData = await apiResponse.json();
+      
+      if (!apiResponse.ok) {
+        throw new Error(apiData.error || 'API request failed');
+      }
+      
+      if (!apiData.success) {
+        throw new Error(apiData.error || 'API returned unsuccessful response');
+      }
+      
+      const response = apiData.traitsAndMoves;
       
       // Log the AI response to console as requested
-      console.log("NEAR AI Traits Generator Response:", response);
+      console.log("0G AI Traits Generator Response:", response);
       
-      // Try to parse the response to extract traits and moves
+      // For now, just print the response to console as requested
+      console.log("🎮 WARRIOR TRAITS AND MOVES GENERATED:");
+      console.log("=====================================");
+      console.log(response);
+      console.log("=====================================");
+      
+      // Try to parse and validate the response
       try {
-        // Extract JSON from the response (it might be wrapped in markdown code blocks)
-        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-        let jsonString = jsonMatch ? jsonMatch[1] : response;
+        const parsedResponse = JSON.parse(response);
+        console.log("📊 Parsed AI Response:", parsedResponse);
         
-        // If no JSON blocks found, try to find JSON object directly
-        if (!jsonMatch) {
-          const jsonObjectMatch = response.match(/\{[\s\S]*\}/);
-          jsonString = jsonObjectMatch ? jsonObjectMatch[0] : response;
+        // Validate the response structure
+        const requiredFields = ['Strength', 'Wit', 'Charisma', 'Defence', 'Luck', 'strike_attack', 'taunt_attack', 'dodge', 'recover', 'special_move'];
+        const missingFields = requiredFields.filter(field => !parsedResponse.hasOwnProperty(field));
+        
+        if (missingFields.length === 0) {
+          console.log("✅ Response contains all required fields for traits and moves");
+          
+          // Validate trait values are within range
+          const traits = ['Strength', 'Wit', 'Charisma', 'Defence', 'Luck'];
+          const invalidTraits = traits.filter(trait => {
+            const value = parsedResponse[trait];
+            return typeof value !== 'number' || value < 0 || value > 10000;
+          });
+          
+          if (invalidTraits.length === 0) {
+            console.log("✅ All trait values are within valid range (0-10000)");
+            console.log("🎭 Generated Traits:", {
+              Strength: parsedResponse.Strength,
+              Wit: parsedResponse.Wit,
+              Charisma: parsedResponse.Charisma,
+              Defence: parsedResponse.Defence,
+              Luck: parsedResponse.Luck
+            });
+            console.log("⚔️ Generated Moves:", {
+              strike_attack: parsedResponse.strike_attack,
+              taunt_attack: parsedResponse.taunt_attack,
+              dodge: parsedResponse.dodge,
+              recover: parsedResponse.recover,
+              special_move: parsedResponse.special_move
+            });
+          } else {
+            console.warn("⚠️ Invalid trait values for:", invalidTraits.join(', '));
+          }
+        } else {
+          console.warn("⚠️ Missing required fields:", missingFields.join(', '));
         }
         
-        const parsedResponse = JSON.parse(jsonString);
-        console.log("Parsed AI Response:", parsedResponse);
-        
-        // Extract traits and moves from the AI response
-        const traitsData = gameMasterSigningService.extractTraitsAndMoves(parsedResponse, warriors.tokenId);
-        console.log("Extracted traits and moves:", traitsData);
-        
-        // Sign the data with Game Master private key
-        const signature = await gameMasterSigningService.signTraitsAndMoves(traitsData);
-        console.log("Game Master signature:", signature);
-        
-        // Call the smart contract to assign traits and moves
-        console.log("Calling assignTraitsAndMoves on WarriorsNFT contract...");
-        
-        writeContract({
-          address: chainsToContracts[545].warriorsNFT as `0x${string}`,
-          abi: warriorsNFTAbi,
-          functionName: 'assignTraitsAndMoves',
-          args: [
-            traitsData.tokenId,      // uint16 _tokenId
-            traitsData.strength,     // uint16 _strength
-            traitsData.wit,          // uint16 _wit
-            traitsData.charisma,     // uint16 _charisma
-            traitsData.defence,      // uint16 _defence
-            traitsData.luck,         // uint16 _luck
-            traitsData.strike,       // string _strike
-            traitsData.taunt,        // string _taunt
-            traitsData.dodge,        // string _dodge
-            traitsData.special,      // string _special
-            traitsData.recover,      // string _recover
-            signature                // bytes _signedData
-          ],
-        });
-        
-        alert(`Activation completed! Traits and moves assigned to ${warriors.name}. Transaction submitted to blockchain.`);
+        alert(`✅ Traits and moves generated successfully for ${warriors.name}! Check console for details.`);
         
       } catch (parseError) {
-        console.warn("Could not parse JSON from AI response, but activation call was successful:", parseError);
+        console.warn("Could not parse JSON from AI response:", parseError);
         console.log("Raw AI Response:", response);
-        alert(`Activation completed! Raw AI response logged to console for ${warriors.name}`);
+        alert(`⚠️ AI response received but couldn't parse JSON. Check console for raw response.`);
       }
       
     } catch (error) {
-      console.error("Error activating Warriors with NEAR AI:", error);
-      alert(`Failed to activate ${warriors.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Error activating Warriors with 0G AI:", error);
+      alert(`❌ Failed to activate ${warriors.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsActivating(false);
     }
@@ -1197,11 +1138,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                         className="w-full h-32 bg-gray-900 border-2 border-gray-600 text-gray-300 p-3 text-xs resize-none focus:border-yellow-600 focus:outline-none transition-colors rounded-2xl"
                         style={{fontFamily: 'Press Start 2P, monospace'}}
                       />
-                      {/* <iframe 
-                        src="https://app.near.ai/embed/samkitsoni.near/attributes-generator/latest?theme=dark" 
-                        sandbox="allow-scripts allow-popups allow-same-origin allow-forms"
-                        style={{border: 'none', height: '100svh'}}>
-                      </iframe> */}
+
                     </div>
 
                     <button
@@ -1747,66 +1684,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                             </p>
                           </div>
                           
-                          {/* Wallet Connection Status for Activation */}
-                          <div className="mb-4">
-                            {nearWalletConnected ? (
-                              <div className="bg-green-900 border-2 border-green-500 rounded-xl p-3">
-                                <p 
-                                  className="text-green-400 text-xs text-center"
-                                  style={{fontFamily: 'Press Start 2P, monospace'}}
-                                >
-                                  ✅ WALLET CONNECTED
-                                </p>
-                                <p 
-                                  className="text-green-300 text-xs text-center mt-1"
-                                  style={{fontFamily: 'Press Start 2P, monospace'}}
-                                >
-                                  {nearWalletService.getAccountId()}
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="bg-yellow-900 border-2 border-yellow-500 rounded-xl p-3">
-                                <p 
-                                  className="text-yellow-400 text-xs text-center mb-3"
-                                  style={{fontFamily: 'Press Start 2P, monospace'}}
-                                >
-                                  ⚠️ WALLET NOT CONNECTED
-                                </p>
-                                <div className="mt-2 mb-3">
-                                  <span 
-                                    className="text-xs text-blue-300"
-                                    style={{fontFamily: 'Press Start 2P, monospace'}}
-                                  >
-                                    SEPARATE FROM FLOW WALLET
-                                  </span>
-                                </div>
-                                <div className="space-y-2">
-                                  <button
-                                    onClick={connectMeteorWallet}
-                                    className="w-full py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                                    style={{fontFamily: 'Press Start 2P, monospace'}}
-                                  >
-                                    CONNECT METEOR WALLET
-                                  </button>
-                                  <button
-                                    onClick={connectHotWallet}
-                                    className="w-full py-2 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-                                    style={{fontFamily: 'Press Start 2P, monospace'}}
-                                  >
-                                    CONNECT HOT WALLET
-                                  </button>
-                                </div>
-                                <div className="mt-3 pt-2 border-t border-gray-600">
-                                  <p 
-                                    className="text-xs text-gray-400 text-center"
-                                    style={{fontFamily: 'Press Start 2P, monospace'}}
-                                  >
-                                    SUPPORTS METEOR & HOT WALLETS
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+
                           
                           <button
                             className={`w-full arcade-button py-4 text-sm tracking-wide ${
@@ -1819,7 +1697,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                             onClick={() => handleActivateWarriors(selectedWarriors)}
                             disabled={isActivating}
                           >
-                            {isActivating ? '🔄 ACTIVATING...' : '🌟 ACTIVATE WARRIORS'}
+                            {isActivating ? '🔄 ACTIVATING...' : '🌟 ACTIVATE YODHA'}
                           </button>
                         </div>
                       )}
