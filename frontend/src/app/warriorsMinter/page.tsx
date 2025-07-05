@@ -411,7 +411,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
       // Log the AI response to console as requested
       console.log("0G AI Traits Generator Response:", response);
       
-      // For now, just print the response to console as requested
+      // Log the AI response to console for debugging
       console.log("🎮 WARRIOR TRAITS AND MOVES GENERATED:");
       console.log("=====================================");
       console.log(response);
@@ -452,14 +452,49 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
               recover: parsedResponse.recover,
               special_move: parsedResponse.special_move
             });
+            
+            // Extract traits and moves from the AI response
+            const traitsData = gameMasterSigningService.extractTraitsAndMoves(parsedResponse, warriors.tokenId);
+            console.log("📋 Extracted traits and moves:", traitsData);
+            
+            // Sign the data with Game Master private key
+            const signature = await gameMasterSigningService.signTraitsAndMoves(traitsData);
+            console.log("✍️ Game Master signature:", signature);
+            
+            // Call the smart contract to assign traits and moves
+            console.log("🔗 Calling assignTraitsAndMoves on WarriorsNFT contract...");
+            
+            writeContract({
+              address: chainsToContracts[545].warriorsNFT as `0x${string}`,
+              abi: warriorsNFTAbi,
+              functionName: 'assignTraitsAndMoves',
+              args: [
+                traitsData.tokenId,      // uint16 _tokenId
+                traitsData.strength,     // uint16 _strength
+                traitsData.wit,          // uint16 _wit
+                traitsData.charisma,     // uint16 _charisma
+                traitsData.defence,      // uint16 _defence
+                traitsData.luck,         // uint16 _luck
+                traitsData.strike,       // string _strike
+                traitsData.taunt,        // string _taunt
+                traitsData.dodge,        // string _dodge
+                traitsData.special,     // string _special
+                traitsData.recover,     // string _recover
+                signature               // bytes _signedData
+              ],
+            });
+            
+            console.log("✅ Smart contract call initiated!");
+            alert(`🎉 Traits and moves generated and assigned to ${warriors.name}! Transaction submitted to blockchain.`);
+            
           } else {
             console.warn("⚠️ Invalid trait values for:", invalidTraits.join(', '));
+            alert(`⚠️ Invalid trait values generated: ${invalidTraits.join(', ')}`);
           }
         } else {
           console.warn("⚠️ Missing required fields:", missingFields.join(', '));
+          alert(`⚠️ AI response missing required fields: ${missingFields.join(', ')}`);
         }
-        
-        alert(`✅ Traits and moves generated successfully for ${warriors.name}! Check console for details.`);
         
       } catch (parseError) {
         console.warn("Could not parse JSON from AI response:", parseError);
