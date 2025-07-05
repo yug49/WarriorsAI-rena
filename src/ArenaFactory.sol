@@ -75,7 +75,7 @@ contract ArenaFactory {
     mapping(address => bool) private isArena;
     mapping(address => IWarriorsNFT.Ranking) private arenaRankings;
     address private immutable i_crownTokenAddress;
-    address private immutable i_nearAiPublicKey;
+    address private immutable i_AiPublicKey;
     address private immutable i_cadenceArch;
     address private immutable i_WarriorsNFTCollection;
 
@@ -90,7 +90,7 @@ contract ArenaFactory {
      * @param _costToInfluence The cost to influence an arena
      * @param _costToDefluence The cost to defluence an arena
      * @param _crownTokenAddress The address of the Crown token contract
-     * @param _nearAiPublicKey The public key for Near AI
+     * @param _AiPublicKey The public key for  AI
      * @param _cadenceArch The address of the Cadence architecture
      * @param _WarriorsNFTCollection The address of the Warriors NFT collection
      * @param _betAmount The initial bet amount for the arenas
@@ -99,7 +99,7 @@ contract ArenaFactory {
         uint256 _costToInfluence,
         uint256 _costToDefluence,
         address _crownTokenAddress,
-        address _nearAiPublicKey,
+        address _AiPublicKey,
         address _cadenceArch,
         address _WarriorsNFTCollection,
         uint256 _betAmount
@@ -107,7 +107,7 @@ contract ArenaFactory {
         if (_crownTokenAddress == address(0)) {
             revert ArenaFactory__InvalidAddress();
         }
-        if (_nearAiPublicKey == address(0)) {
+        if (_AiPublicKey == address(0)) {
             revert ArenaFactory__InvalidAddress();
         }
         if (_cadenceArch == address(0)) {
@@ -130,7 +130,7 @@ contract ArenaFactory {
             _costToInfluence,
             _costToDefluence,
             _crownTokenAddress,
-            _nearAiPublicKey,
+            _AiPublicKey,
             _cadenceArch,
             _WarriorsNFTCollection,
             _betAmount,
@@ -141,7 +141,7 @@ contract ArenaFactory {
             _costToInfluence * 2,
             _costToDefluence * 2,
             _crownTokenAddress,
-            _nearAiPublicKey,
+            _AiPublicKey,
             _cadenceArch,
             _WarriorsNFTCollection,
             _betAmount * 2,
@@ -152,7 +152,7 @@ contract ArenaFactory {
             _costToInfluence * 3,
             _costToDefluence * 3,
             _crownTokenAddress,
-            _nearAiPublicKey,
+            _AiPublicKey,
             _cadenceArch,
             _WarriorsNFTCollection,
             _betAmount * 3,
@@ -163,7 +163,7 @@ contract ArenaFactory {
             _costToInfluence * 4,
             _costToDefluence * 4,
             _crownTokenAddress,
-            _nearAiPublicKey,
+            _AiPublicKey,
             _cadenceArch,
             _WarriorsNFTCollection,
             _betAmount * 4,
@@ -174,7 +174,7 @@ contract ArenaFactory {
             _costToInfluence * 5,
             _costToDefluence * 5,
             _crownTokenAddress,
-            _nearAiPublicKey,
+            _AiPublicKey,
             _cadenceArch,
             _WarriorsNFTCollection,
             _betAmount * 5,
@@ -198,7 +198,7 @@ contract ArenaFactory {
         arenaRankings[address(arena5)] = IWarriorsNFT.Ranking.PLATINUM;
 
         i_crownTokenAddress = _crownTokenAddress;
-        i_nearAiPublicKey = _nearAiPublicKey;
+        i_AiPublicKey = _AiPublicKey;
         i_cadenceArch = _cadenceArch;
         i_WarriorsNFTCollection = _WarriorsNFTCollection;
     }
@@ -227,7 +227,7 @@ contract ArenaFactory {
             _costToInfluence,
             _costToDefluence,
             i_crownTokenAddress,
-            i_nearAiPublicKey,
+            i_AiPublicKey,
             i_cadenceArch,
             i_WarriorsNFTCollection,
             _betAmount,

@@ -1,0 +1,1052 @@
+@import "tailwindcss";
+
+:root {
+  --arcade-gold: #ffd700;
+  --arcade-red: #dc143c;
+  --arcade-blue: #1e3a8a;
+  --metal-silver: #c0c0c0;
+  --stone-dark: #2d2d2d;
+  --bronze: #cd7f32;
+}
+
+body {
+  background: #0f0f0f;
+  color: #f0f0f0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+/* Arcade Text Effects */
+.arcade-glow {
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 3px currentColor;
+}
+
+.metal-text {
+  background: linear-gradient(135deg, #c0c0c0, #808080, #c0c0c0);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Epic Borders and Frames */
+.arcade-border {
+  border: 2px solid #ffd700;
+  box-shadow: 
+    0 0 8px rgba(255, 215, 0, 0.2),
+    inset 0 0 8px rgba(255, 215, 0, 0.05),
+    0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.battle-frame {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  border: 2px solid #cd7f32;
+  position: relative;
+}
+
+.battle-frame::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #ffd700, #dc143c, #1e3a8a, #ffd700);
+  z-index: -1;
+  border-radius: inherit;
+}
+
+/* Arcade Card Styles */
+.arcade-card {
+  background: 
+    radial-gradient(circle at top left, rgba(255, 215, 0, 0.1), transparent 50%),
+    linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 30%, #1a1a1a 100%);
+  border: 3px solid;
+  border-image: linear-gradient(45deg, #ffd700, #cd7f32) 1;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.arcade-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 0 12px rgba(255, 215, 0, 0.25),
+    0 6px 12px rgba(0, 0, 0, 0.6);
+  border-image: linear-gradient(45deg, #ffd700, #dc143c) 1;
+}
+
+/* Red themed arcade card for header */
+.arcade-card-red {
+  background: 
+    radial-gradient(circle at top left, rgba(220, 38, 38, 0.15), rgba(185, 28, 28, 0.1) 50%),
+    linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(185, 28, 28, 0.15) 30%, rgba(220, 38, 38, 0.2) 100%);
+  border: 2px solid;
+  border-image: linear-gradient(45deg, #dc2626, #ef4444) 1;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  transition: all 0.3s ease;
+}
+
+.arcade-card-red:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 12px rgba(220, 38, 38, 0.3),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+  border-image: linear-gradient(45deg, #ef4444, #f87171) 1;
+}
+
+/* Slate themed arcade card for header (better than red) */
+.arcade-card-slate {
+  background: 
+    radial-gradient(circle at top left, rgba(100, 116, 139, 0.2), rgba(71, 85, 105, 0.15) 50%),
+    linear-gradient(135deg, rgba(100, 116, 139, 0.25) 0%, rgba(71, 85, 105, 0.2) 30%, rgba(100, 116, 139, 0.25) 100%);
+  border: 2px solid #64748b;
+  border-radius: 12px !important;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  transition: all 0.3s ease;
+}
+
+.arcade-card-slate:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 12px rgba(100, 116, 139, 0.3),
+    0 6px 12px rgba(0, 0, 0, 0.4);
+  border-color: #94a3b8;
+}
+
+/* White color for RANN token amount */
+.arcade-card-slate .text-red-400:last-child {
+  color: #ffffff !important;
+}
+
+/* Enhanced Arena Card Styling */
+.arena-list-card {
+  background: 
+    linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 30%, #1a1a1a 100%);
+  border: 2px solid;
+  border-image: linear-gradient(45deg, #cd7f32, #ffd700, #cd7f32) 1;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(255, 215, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.arena-list-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 20px rgba(0, 0, 0, 0.8),
+    0 0 16px rgba(255, 215, 0, 0.2);
+  border-image: linear-gradient(45deg, #ffd700, #ffed4a, #ffd700) 1;
+}
+
+.arena-stat-box {
+  background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+  border: 1px solid #cd7f32;
+  transition: all 0.3s ease;
+}
+
+.arena-stat-box:hover {
+  border-color: #ffd700;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.3);
+}
+
+.warriors-image-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.warriors-image-container::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.warriors-image-container:hover::after {
+  opacity: 1;
+}
+
+/* Epic Buttons */
+.arcade-button {
+  background: linear-gradient(135deg, #dc143c 0%, #8b0000 50%, #dc143c 100%);
+  border: 2px solid #ffd700;
+  color: #ffd700;
+  font-family: 'Press Start 2P', monospace;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.arcade-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.arcade-button:hover::before {
+  left: 100%;
+}
+
+.arcade-button:hover {
+  background: linear-gradient(135deg, #ff1744 0%, #dc143c 50%, #ff1744 100%);
+  box-shadow: 
+    0 0 8px rgba(255, 215, 0, 0.4),
+    0 0 16px rgba(220, 20, 60, 0.2);
+  transform: scale(1.02);
+}
+
+/* Red themed connect button wrapper */
+.connect-button-wrapper-red button {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Red themed arcade buttons */
+.arcade-button-red {
+  background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+  border: 2px solid #f87171 !important;
+  color: #ffffff !important;
+  padding: 8px 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.arcade-button-red:hover {
+  background: linear-gradient(135deg, #ef4444, #f87171) !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4) !important;
+  transform: scale(1.02) !important;
+}
+
+.arcade-button-red-small {
+  background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+  border: 2px solid #f87171 !important;
+  color: #ffffff !important;
+  padding: 6px 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.arcade-button-red-small:hover {
+  background: linear-gradient(135deg, #ef4444, #f87171) !important;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.4) !important;
+  transform: scale(1.02) !important;
+}
+
+.arcade-button-red-error {
+  background: linear-gradient(135deg, #991b1b, #dc2626) !important;
+  border: 2px solid #ef4444 !important;
+  color: #ffffff !important;
+  padding: 8px 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: pulse-error 2s ease-in-out infinite;
+}
+
+@keyframes pulse-error {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(220, 38, 38, 0.6);
+  }
+}
+
+/* Slate themed connect button wrapper */
+.connect-button-wrapper-slate button {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Slate themed arcade buttons - much better looking */
+.arcade-button-slate {
+  background: linear-gradient(135deg, #475569, #64748b) !important;
+  border: 2px solid #94a3b8 !important;
+  color: #f1f5f9 !important;
+  padding: 12px 24px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 8px rgba(100, 116, 139, 0.2);
+  border-radius: 12px !important;
+  min-height: 48px !important;
+}
+
+.arcade-button-slate:hover {
+  background: linear-gradient(135deg, #64748b, #94a3b8) !important;
+  box-shadow: 0 0 16px rgba(100, 116, 139, 0.4) !important;
+  transform: scale(1.02) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.arcade-button-slate-medium {
+  background: linear-gradient(135deg, #475569, #64748b) !important;
+  border: 2px solid #94a3b8 !important;
+  color: #f1f5f9 !important;
+  padding: 8px 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.2);
+  border-radius: 12px !important;
+  min-height: 40px !important;
+}
+
+.arcade-button-slate-medium:hover {
+  background: linear-gradient(135deg, #64748b, #94a3b8) !important;
+  box-shadow: 0 0 12px rgba(100, 116, 139, 0.4) !important;
+  transform: scale(1.02) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.arcade-button-slate-error {
+  background: linear-gradient(135deg, #7f1d1d, #991b1b) !important;
+  border: 2px solid #dc2626 !important;
+  color: #ffffff !important;
+  padding: 12px 24px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: pulse-error 2s ease-in-out infinite;
+  border-radius: 12px !important;
+  min-height: 48px !important;
+}
+
+/* Icon Containers */
+.weapon-container {
+  background: radial-gradient(circle, #2d2d2d, #1a1a1a);
+  border: 2px solid #cd7f32;
+  position: relative;
+}
+
+.weapon-container::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), transparent);
+  pointer-events: none;
+}
+
+/* Battlefield Background with Arena Image */
+.battlefield-bg {
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(220, 20, 60, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(30, 58, 138, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(15, 15, 15, 0.2) 0%, rgba(26, 26, 26, 0.3) 50%, rgba(15, 15, 15, 0.2) 100%),
+    url('/Arena.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Meet The Team Background with MTT Image */
+.meettheteam-bg {
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(220, 20, 60, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(30, 58, 138, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(15, 15, 15, 0.2) 0%, rgba(26, 26, 26, 0.3) 50%, rgba(15, 15, 15, 0.2) 100%),
+    url('/mtt.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Leaderboard Background with Leaderboard Image */
+.leaderboard-bg {
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(220, 20, 60, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(30, 58, 138, 0.02) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(15, 15, 15, 0.1) 0%, rgba(26, 26, 26, 0.15) 50%, rgba(15, 15, 15, 0.1) 100%),
+    url('/Leaderboard.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Bazaar Background with Bazaar Image */
+.bazaar-bg {
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(220, 20, 60, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(30, 58, 138, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(15, 15, 15, 0.2) 0%, rgba(26, 26, 26, 0.3) 50%, rgba(15, 15, 15, 0.2) 100%),
+    url('/Bazaar.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Gurukul Background with Gurukul Image */
+.gurukul-bg {
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(220, 20, 60, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(30, 58, 138, 0.05) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(15, 15, 15, 0.2) 0%, rgba(26, 26, 26, 0.3) 50%, rgba(15, 15, 15, 0.2) 100%),
+    url('/Gurukul.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* Animated Background Elements */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes float-weapon {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(2deg); }
+}
+
+.floating-element {
+  animation: float-weapon 4s ease-in-out infinite;
+}
+
+.pulse-element {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Header Styles */
+.arcade-header {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  border-bottom: 3px solid #ffd700;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+}
+
+/* Grey Themed Translucent Header */
+.arcade-header-grey {
+  background: 
+    radial-gradient(circle at top left, rgba(100, 116, 139, 0.25), rgba(71, 85, 105, 0.15) 50%),
+    linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(71, 85, 105, 0.25) 30%, rgba(100, 116, 139, 0.3) 100%);
+  border-bottom: 3px solid rgba(148, 163, 184, 0.6);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    0 0 12px rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: relative;
+}
+
+.arcade-header-grey::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(51, 65, 85, 0.1);
+  pointer-events: none;
+}
+
+/* Footer Styles */
+.arcade-footer {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  border-top: 3px solid #ffd700;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.8);
+}
+
+/* Grey Themed Translucent Footer */
+.arcade-footer-grey {
+  width: 100%;
+  padding: 1.25rem 0.5rem;
+  background: 
+    radial-gradient(circle at bottom right, rgba(100, 116, 139, 0.25), rgba(71, 85, 105, 0.15) 50%),
+    linear-gradient(135deg, rgba(100, 116, 139, 0.3) 0%, rgba(71, 85, 105, 0.25) 30%, rgba(100, 116, 139, 0.3) 100%);
+  border-top: 3px solid rgba(148, 163, 184, 0.6);
+  box-shadow: 
+    0 -4px 20px rgba(0, 0, 0, 0.3),
+    0 0 12px rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Press Start 2P', monospace;
+  letter-spacing: 0.04em;
+  position: relative;
+}
+
+.arcade-footer-grey::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(51, 65, 85, 0.1);
+  pointer-events: none;
+}
+
+.footer-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-title {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #f1f5f9;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 4px rgba(241, 245, 249, 0.3);
+}
+
+.footer-title-red {
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #ef4444;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 4px rgba(239, 68, 68, 0.4);
+}
+
+.footer-subtitle {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  margin-bottom: 0.2rem;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.6),
+    0 0 2px rgba(226, 232, 240, 0.2);
+}
+
+.footer-links {
+  font-size: 0.95rem;
+  color: #e2e8f0;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.footer-link {
+  color: #f1f5f9;
+  margin-left: 8px;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.footer-link:hover {
+  color: #cbd5e1;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 6px rgba(203, 213, 225, 0.4);
+}
+
+.footer-icon {
+  font-size: 1.25em;
+}
+
+.footer-link-text {
+  color: #f1f5f9;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1em;
+  margin-left: 8px;
+  border-bottom: 1.5px dashed rgba(241, 245, 249, 0.6);
+  transition: all 0.3s ease;
+}
+
+.footer-link-text:hover {
+  color: #cbd5e1;
+  border-bottom-color: rgba(203, 213, 225, 0.8);
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 4px rgba(203, 213, 225, 0.3);
+}
+
+.footer-team {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  opacity: 0.7;
+}
+
+/* Arcade Button with Icon */
+.arcade-button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Connect Button Arcade Style */
+.connect-button-wrapper button {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6) !important;
+  border: 2px solid #ffd700 !important;
+  color: #ffd700 !important;
+  transition: all 0.3s ease !important;
+  text-transform: uppercase !important;
+}
+
+.connect-button-wrapper button:hover {
+  background: linear-gradient(135deg, #3b82f6, #1e3a8a) !important;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.3) !important;
+  transform: scale(1.02) !important;
+}
+
+/* Kurukshetra Battle Arena Styles */
+.battle-arena-bg {
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(220, 20, 60, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(30, 58, 138, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.05) 0%, transparent 70%),
+    linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #0f0f0f 100%);
+}
+
+.arena-card-hover {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.arena-card-hover:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 
+    0 0 20px rgba(255, 215, 0, 0.3),
+    0 12px 24px rgba(0, 0, 0, 0.8);
+}
+
+/* Health Bar Styles */
+.health-bar {
+  background: linear-gradient(90deg, #dc143c 0%, #ff6b6b 100%);
+  box-shadow: 
+    0 0 4px rgba(220, 20, 60, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Move Icons Container */
+.move-icon-container {
+  background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+  border: 2px solid #cd7f32;
+  border-radius: 50%;
+  padding: 8px;
+  position: relative;
+}
+
+.move-icon-container::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(45deg, rgba(255, 215, 0, 0.1), transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Round Timer */
+.round-timer {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  border: 2px solid #ffd700;
+  animation: pulse-timer 2s ease-in-out infinite;
+}
+
+@keyframes pulse-timer {
+  0%, 100% { 
+    box-shadow: 0 0 4px rgba(255, 215, 0, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+  }
+}
+
+/* Damage Indicator */
+.damage-indicator {
+  color: #ff4444;
+  text-shadow: 0 0 4px rgba(255, 68, 68, 0.6);
+  animation: damage-flash 0.5s ease-in-out;
+}
+
+@keyframes damage-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Victory Glow */
+.victory-glow {
+  animation: victory-pulse 2s ease-in-out infinite;
+}
+
+@keyframes victory-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  }
+}
+
+/* Battle State Badges */
+.state-empty {
+  background: linear-gradient(135deg, #4b5563, #6b7280);
+  border: 1px solid #9ca3af;
+}
+
+.state-initialized {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  border: 1px solid #60a5fa;
+}
+
+.state-battle {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  border: 1px solid #f87171;
+}
+
+.state-finished {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border: 1px solid #34d399;
+}
+
+/* Betting Interface */
+.bet-selector {
+  background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.bet-selector.selected {
+  border-color: #ffd700;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #000;
+}
+
+.bet-selector:hover {
+  border-color: #ffd700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+/* Rank Category Colors */
+.rank-unranked { color: #9ca3af; }
+.rank-bronze { color: #cd7f32; }
+.rank-silver { color: #c0c0c0; }
+.rank-gold { color: #ffd700; }
+.rank-platinum { color: #22d3ee; }
+
+/* Trait Bars Enhanced */
+.trait-bar-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.trait-bar-fill {
+  background: linear-gradient(90deg, #ffd700, #ffed4a);
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.4);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.trait-bar-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: trait-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes trait-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes coin-rotate {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+
+.coin-spin {
+  animation: coin-rotate 2s linear infinite;
+  display: inline-block;
+}
+
+/* Create Arena Form */
+.create-arena-form {
+  background: 
+    linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 30%, #1a1a1a 100%);
+  border: 3px solid;
+  border-image: linear-gradient(45deg, #ffd700, #cd7f32, #ffd700) 1;
+}
+
+/* Arena Modal Enhancements */
+.arena-modal {
+  backdrop-filter: blur(4px);
+  animation: modal-appear 0.3s ease-out;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Battle Phase Indicators */
+.phase-betting {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.phase-interval {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.phase-calculating {
+  background: linear-gradient(135deg, #ea580c, #fb923c);
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+/* Influence/Defluence Buttons */
+.influence-button {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border: 2px solid #34d399;
+  position: relative;
+  overflow: hidden;
+}
+
+.influence-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.influence-button:hover::before {
+  left: 100%;
+}
+
+.defluence-button {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  border: 2px solid #f87171;
+  position: relative;
+  overflow: hidden;
+}
+
+.defluence-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.defluence-button:hover::before {
+  left: 100%;
+}
+
+/* Enhanced Tab Styling */
+.arcade-tabs {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  border: 3px solid;
+  border-image: linear-gradient(45deg, #ffd700, #cd7f32, #ffd700) 1;
+  box-shadow: 
+    0 0 12px rgba(255, 215, 0, 0.2),
+    inset 0 0 12px rgba(255, 215, 0, 0.05);
+}
+
+.arcade-tab-trigger {
+  position: relative;
+  overflow: hidden;
+  font-family: 'Press Start 2P', monospace;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.arcade-tab-trigger::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.arcade-tab-trigger:hover::before {
+  left: 100%;
+}
+
+.arcade-tab-trigger.active {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4a 50%, #ffd700 100%);
+  color: #000;
+  text-shadow: none;
+  box-shadow: 
+    0 0 8px rgba(255, 215, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.arcade-tab-trigger.active::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ffd700, #ffed4a, #ffd700);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+}
+
+/* Rank Filter Enhanced Styling */
+.rank-filter-container {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  border: 2px solid;
+  border-image: linear-gradient(45deg, #cd7f32, #ffd700, #cd7f32) 1;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(255, 215, 0, 0.1);
+}
+
+.rank-button {
+  position: relative;
+  font-family: 'Press Start 2P', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.rank-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.4s ease;
+}
+
+.rank-button:hover::before {
+  left: 100%;
+}
+
+.rank-button.active {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%);
+  color: #000;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 
+    0 0 12px rgba(255, 215, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  border: 2px solid #ffed4a;
+}
+
+.rank-button:not(.active):hover {
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffed4a;
+  border-color: rgba(255, 215, 0, 0.3);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+}
+
+/* Special rank colors for active buttons */
+.rank-button.active.rank-unranked {
+  background: linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%);
+  color: #1f2937;
+}
+
+.rank-button.active.rank-bronze {
+  background: linear-gradient(135deg, #cd7f32 0%, #e8a853 100%);
+  color: #1f2937;
+}
+
+.rank-button.active.rank-silver {
+  background: linear-gradient(135deg, #c0c0c0 0%, #e5e5e5 100%);
+  color: #1f2937;
+}
+
+.rank-button.active.rank-gold {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%);
+  color: #1f2937;
+}
+
+.rank-button.active.rank-platinum {
+  background: linear-gradient(135deg, #22d3ee 0%, #67e8f9 100%);
+  color: #1f2937;
+}
+
+/* Tab Content Animation */
+.tab-content-enter {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: tab-enter 0.3s ease-out forwards;
+}
+
+@keyframes tab-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

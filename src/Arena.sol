@@ -126,7 +126,7 @@ contract Arena {
     uint256 private immutable i_costToDefluence; // Cost to defluence a Warriors
     uint256 private s_costToDefluenceWarriorsOne;
     uint256 private s_costToDefluenceWarriorsTwo;
-    address private immutable i_nearAiPublicKey; // Public key of the ai that selects the next moves of the Warriorss
+    address private immutable i_AiPublicKey; // Public key of the ai that selects the next moves of the Warriorss
     address private immutable i_WarriorsNFTCollection; // Address of the Warriors NFT collection contract
     uint256 private immutable i_betAmount; // Amount to be betted by the players on Warriors One and Warriors Two
     uint256 private s_totalInfluencePointsOfWarriorsOneForNextRound;
@@ -135,7 +135,7 @@ contract Arena {
     uint256 private s_totalDefluencePointsOfWarriorsTwoForNextRound;
     uint256 private s_WarriorsOneNFTId; // NFT ID of Warriors One
     uint256 private s_WarriorsTwoNFTId; // NFT ID of Warriors Two
-    // address private s_bridgeAddress; // Address of bridge contract the connects this Flow chain to NEAR chain(holding the AI agents)
+    // address private s_bridgeAddress; // Address of bridge contract the connects this Flow chain to  chain(holding the AI agents)
     uint8 private s_currentRound; // Current Round of the game (0 when game is not started yet can be initialized, 1-5 when game is in progress)
     address[] private s_playerOneBetAddresses; // Players' addresses that have placed their bets on Warriors One
     // mapping(address => uint256) private s_playerOneBetAmounts; // Bet amounts of the betters siding with Warriors One
@@ -167,7 +167,7 @@ contract Arena {
         uint256 _costToInfluence,
         uint256 _costToDefluence,
         address _CrownTokenAddress,
-        address _nearAiPublicKey,
+        address _AiPublicKey,
         address _cadenceArch,
         address _WarriorsNFTCollection,
         uint256 _betAmount,
@@ -179,7 +179,7 @@ contract Arena {
         if (_costToInfluence == 0 || _costToDefluence == 0) {
             revert Arena__CostCannotBeZero();
         }
-        if (_nearAiPublicKey == address(0)) {
+        if (_AiPublicKey == address(0)) {
             revert Arena__InvalidAddress();
         }
         if (_cadenceArch == address(0)) {
@@ -199,7 +199,7 @@ contract Arena {
         s_costToDefluenceWarriorsOne = _costToDefluence;
         s_costToDefluenceWarriorsTwo = _costToDefluence;
         i_CrownToken = ICrownToken(_CrownTokenAddress);
-        i_nearAiPublicKey = _nearAiPublicKey;
+        i_AiPublicKey = _AiPublicKey;
         i_cadenceArch = _cadenceArch;
         i_WarriorsNFTCollection = _WarriorsNFTCollection;
         i_betAmount = _betAmount;
@@ -489,7 +489,7 @@ contract Arena {
         }
         bytes32 ethSignedMessage = MessageHashUtils.toEthSignedMessageHash(dataHash);
         address recovered = ECDSA.recover(ethSignedMessage, _signedData);
-        if (recovered != i_nearAiPublicKey) {
+        if (recovered != i_AiPublicKey) {
             revert Arena__InvalidSignature();
         }
 
@@ -963,8 +963,8 @@ contract Arena {
         return s_costToDefluenceWarriorsTwo;
     }
 
-    function getNearAiPublicKey() external view returns (address) {
-        return i_nearAiPublicKey;
+    function getAiPublicKey() external view returns (address) {
+        return i_AiPublicKey;
     }
 
     function getBetAmount() external view returns (uint256) {

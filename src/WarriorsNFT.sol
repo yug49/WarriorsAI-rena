@@ -66,7 +66,6 @@ import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/Ree
  *         -++-+####+++---..-.........
  *           .....
  */
-
 interface IOracle {
     function verifyProof(bytes calldata proof) external view returns (bool);
 }
@@ -130,12 +129,12 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
     mapping(uint256 => bool) private s_traitsAssigned;
     mapping(uint256 => uint256) private s_WarriorsIdToWinAmounts;
     address private immutable i_dao;
-    address private immutable i_nearAiPublicKey; // NEAR AI Public Key for generating traits and moves
+    address private immutable i_AiPublicKey; //  AI Public Key for generating traits and moves
 
     mapping(uint256 => bytes32) private _metadataHashes;
     mapping(uint256 => string) private _encryptedURIs;
     mapping(uint256 => mapping(address => bytes)) private _authorizations;
-    
+
     address public s_oracle;
 
     /**
@@ -174,12 +173,12 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
     /**
      * @notice This constructor initializes the WarriorsNFT collection contract.
      * @param _dao The address of the DAO.
-     * @param _nearAiPublicKey The public key of the NEAR Ai or the Game Master(backend) that will generate the traits or signing the data
+     * @param _AiPublicKey The public key of the  Ai or the Game Master(backend) that will generate the traits or signing the data
      */
-    constructor(address _dao, address _nearAiPublicKey, address _oracle) ERC721("Warriors", "WAR") {
+    constructor(address _dao, address _AiPublicKey, address _oracle) ERC721("Warriors", "WAR") {
         s_tokenCounter = 1; // Start token IDs from 1
         i_dao = _dao;
-        i_nearAiPublicKey = _nearAiPublicKey;
+        i_AiPublicKey = _AiPublicKey;
         s_oracle = _oracle;
     }
 
@@ -253,33 +252,30 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
     }
 
     /**
-     * 
+     *
      * @param from The address of the sender
      * @param to The address of the receiver
      * @param tokenId The token id of the NFT
      * @param sealedKey The sealed key of the NFT
      * @param proof The proof of the NFT -- could be anything, it's just a way, this is to hande encryption of the metadata that can be implemented in the future
      */
-    function transfer(
-        address from,
-        address to,
-        uint256 tokenId,
-        bytes calldata sealedKey,
-        bytes calldata proof
-    ) external nonReentrant {
+    function transfer(address from, address to, uint256 tokenId, bytes calldata sealedKey, bytes calldata proof)
+        external
+        nonReentrant
+    {
         if (ownerOf(tokenId) != from) {
             revert WarriorsNFT__NotOwner();
         }
         if (!IOracle(s_oracle).verifyProof(proof)) {
             revert WarriorsNFT__InvalidProof();
         }
-        
+
         // Update metadata access for new owner
         _updateMetadataAccess(tokenId, to, sealedKey, proof);
-        
+
         // Transfer token ownership
         _transfer(from, to, tokenId);
-        
+
         emit MetadataUpdated(tokenId, keccak256(sealedKey));
     }
 
@@ -295,7 +291,7 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
      * @param _dodge The dodge move name string.
      * @param _special The special move name string.
      * @param _recover The recover move name string.
-     * @param _signedData The signed data from the NEAR AI.
+     * @param _signedData The signed data from the  AI.
      */
     function assignTraitsAndMoves(
         uint16 _tokenId,
@@ -338,7 +334,7 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
         bytes32 ethSignedMessage = MessageHashUtils.toEthSignedMessageHash(dataHash);
         address recovered = ECDSA.recover(ethSignedMessage, _signedData);
 
-        if (recovered != i_nearAiPublicKey) {
+        if (recovered != i_AiPublicKey) {
             revert WarriorsNFT__InvalidSignature();
         }
 
@@ -472,22 +468,19 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
     }
 
     /**
-     * 
+     *
      * @param tokenId The token id of the NFT
      * @param newOwner The new owner of the NFT
      * @param sealedKey The sealed key of the NFT
      * @param proof The proof of the NFT
      */
-    function _updateMetadataAccess(
-        uint256 tokenId,
-        address newOwner,
-        bytes calldata sealedKey,
-        bytes calldata proof
-    ) internal {
+    function _updateMetadataAccess(uint256 tokenId, address newOwner, bytes calldata sealedKey, bytes calldata proof)
+        internal
+    {
         // Extract new metadata hash from proof
         bytes32 newHash = bytes32(proof[0:32]);
         _metadataHashes[tokenId] = newHash;
-        
+
         // Update encrypted URI if provided in proof
         if (proof.length > 64) {
             string memory newURI = string(proof[64:]);
@@ -520,12 +513,12 @@ contract WarriorsNFT is ERC721, ReentrancyGuard {
     function getMetadataHash(uint256 tokenId) external view returns (bytes32) {
         return _metadataHashes[tokenId];
     }
-    
+
     function getEncryptedURI(uint256 tokenId) external view returns (string memory) {
         return _encryptedURIs[tokenId];
     }
 
-    // Function to make manage WarriorsNFTs section in the chaavani app
+    // Function to make manage WarriorsNFTs section in the warriorsMinter app
     function getNFTsOfAOwner(address _owner) public view returns (uint256[] memory) {
         uint256 balanace = balanceOf(_owner);
         uint256[] memory tokenIds = new uint256[](balanace);
