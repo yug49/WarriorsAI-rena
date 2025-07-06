@@ -1,15 +1,27 @@
 import React, { useState, useEffect } from 'react';
 
+interface BattleNotification {
+  isVisible: boolean;
+  warriorsOneName: string;
+  warriorsTwoName: string;
+  warriorsOneMove: string;
+  warriorsTwoMove: string;
+  warriorsOneHitStatus?: 'HIT' | 'MISS' | 'PENDING';
+  warriorsTwoHitStatus?: 'HIT' | 'MISS' | 'PENDING';
+}
+
 interface GameTimerProps {
   gameState: 'betting' | 'playing' | 'idle';
   timeRemaining: number;
   totalTime: number;
+  battleNotification?: BattleNotification | null;
 }
 
 export const GameTimer: React.FC<GameTimerProps> = ({ 
   gameState, 
   timeRemaining, 
-  totalTime 
+  totalTime,
+  battleNotification 
 }) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -33,6 +45,23 @@ export const GameTimer: React.FC<GameTimerProps> = ({
       default:
         return 'Waiting for Battle';
     }
+  };
+
+  const getTimerMessage = () => {
+    if (gameState === 'betting') {
+      return 'Game will start automatically when timer ends';
+    }
+    
+    if (gameState === 'playing') {
+      // Check if moves have been executed and displayed
+      if (battleNotification && battleNotification.isVisible) {
+        return 'Influence/defluence period is going on, do it before the timer gets over';
+      } else {
+        return 'Please wait till the move is executed to influence/defluence for the next round';
+      }
+    }
+    
+    return 'Next round will begin automatically';
   };
 
   if (gameState === 'idle') {
@@ -61,11 +90,8 @@ export const GameTimer: React.FC<GameTimerProps> = ({
           />
         </div>
       </div>
-      <p className="text-gray-400 text-sm">
-        {gameState === 'betting' 
-          ? 'Game will start automatically when timer ends'
-          : 'Next round will begin automatically'
-        }
+      <p className="text-gray-400 text-sm leading-relaxed">
+        {getTimerMessage()}
       </p>
     </div>
   );

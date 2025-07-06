@@ -21,18 +21,6 @@ const Footer = () => {
           >
             <FaGithub className="footer-icon" />
           </a>
-          <a
-            href="/docs"
-            className="footer-link-text"
-          >
-            Docs
-          </a>
-          <a
-            href="/videos"
-            className="footer-link-text"
-          >
-            Videos
-          </a>
         </div>
       </div>
     </footer>

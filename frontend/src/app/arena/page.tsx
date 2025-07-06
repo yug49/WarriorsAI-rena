@@ -2664,6 +2664,7 @@ const ArenaModal = ({
                   gameState={arenaSync.gameState.gameState || 'idle'}
                   timeRemaining={arenaSync.gameState.timeRemaining || 0}
                   totalTime={arenaSync.gameState.totalTime || 0}
+                  battleNotification={battleNotification}
                 />
                 
                 {/* Manual Override Buttons */}

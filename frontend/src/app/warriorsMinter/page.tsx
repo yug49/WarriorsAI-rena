@@ -389,6 +389,14 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     }
   };
 
+  const getTokensNeededForPromotion = (warriors: UserWarriors): number => {
+    if (warriors.rank === 'platinum') return 0;
+    
+    const requirement = getPromotionRequirement(warriors.rank);
+    const tokensNeeded = requirement - warriors.totalWinnings;
+    return Math.max(0, tokensNeeded);
+  };
+
   const handlePromoteWarriors = async (warriors: UserWarriors) => {
     // TODO: Implement actual promotion logic with smart contract
     console.log(`Promoting ${warriors.name} from ${warriors.rank} to ${getNextRank(warriors.rank)}`);
@@ -1749,21 +1757,31 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                     </div>
 
                     {!isWarriorsInactive(selectedWarriors.traits) && selectedWarriors.rank !== 'platinum' ? (
-                      <button
-                        onClick={() => handlePromoteWarriors(selectedWarriors)}
-                        disabled={!canPromote(selectedWarriors)}
-                        className={`w-full py-4 text-sm tracking-wide transition-colors ${
-                          canPromote(selectedWarriors)
-                            ? 'arcade-button'
-                            : 'bg-gray-800 border-2 border-gray-600 text-gray-500 opacity-50 cursor-not-allowed'
-                        }`}
-                        style={{
-                          fontFamily: 'Press Start 2P, monospace',
-                          borderRadius: '12px'
-                        }}
-                      >
-                        {canPromote(selectedWarriors) ? 'PROMOTE WARRIOR' : 'INSUFFICIENT WINNINGS'}
-                      </button>
+                      <div>
+                        {!canPromote(selectedWarriors) && (
+                          <p 
+                            className="text-center text-xs text-yellow-400 mb-4"
+                            style={{fontFamily: 'Press Start 2P, monospace'}}
+                          >
+                            You need {getTokensNeededForPromotion(selectedWarriors)} more CRwN for next rank: {getNextRank(selectedWarriors.rank).toUpperCase()}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => handlePromoteWarriors(selectedWarriors)}
+                          disabled={!canPromote(selectedWarriors)}
+                          className={`w-full py-4 text-sm tracking-wide transition-colors ${
+                            canPromote(selectedWarriors)
+                              ? 'arcade-button'
+                              : 'bg-gray-800 border-2 border-gray-600 text-gray-500 opacity-50 cursor-not-allowed'
+                          }`}
+                          style={{
+                            fontFamily: 'Press Start 2P, monospace',
+                            borderRadius: '12px'
+                          }}
+                        >
+                          {canPromote(selectedWarriors) ? 'PROMOTE WARRIOR' : 'INSUFFICIENT WINNINGS'}
+                        </button>
+                      </div>
                     ) : !isWarriorsInactive(selectedWarriors.traits) && selectedWarriors.rank === 'platinum' ? (
                       <div className="text-center">
                         <p 
