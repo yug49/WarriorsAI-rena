@@ -38,7 +38,14 @@ const clearMetadataCache = () => {
 
 // Helper function to convert IPFS URI or 0G root hash to proper image URL
 const convertIpfsToProxyUrl = (imageUrl: string) => {
-  // Handle 0G storage root hashes
+  // Handle 0G storage URIs (0g://0x...)
+  if (imageUrl.startsWith('0g://')) {
+    // Extract the root hash from the 0G URI
+    const rootHash = imageUrl.replace('0g://', '').split(':')[0];
+    return `http://localhost:3001/download/${rootHash}`;
+  }
+  
+  // Handle 0G storage root hashes (direct 0x format)
   if (imageUrl.startsWith('0x')) {
     // Convert 0G root hash to download URL
     return `http://localhost:3001/download/${imageUrl}`;
@@ -105,7 +112,7 @@ const fetchMetadataFromIPFS = async (tokenURI: string, tokenId?: string): Promis
 
   const cid = tokenURI.replace('ipfs://', '');
   
-  // Use multiple gateways with different characteristics (removed Pinata, using 0G instead)
+  // Use multiple gateways with different characteristics (using 0G Storage)
   const gateways = [
     { url: 'https://ipfs.io/ipfs/', name: 'ipfs.io', timeout: 10000 },
     { url: 'https://dweb.link/ipfs/', name: 'dweb.link', timeout: 12000 },

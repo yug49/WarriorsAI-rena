@@ -42,10 +42,20 @@ export async function generateWarriorAttributes(userInput: string): Promise<stri
     
     // Step 3: Check/Setup ledger account
     try {
-      await broker.ledger.getLedger();
-    } catch (error) {
-      console.log("⚠️  Ledger account does not exist, creating...");
-      await broker.ledger.addLedger(0.1);
+      const existingLedger = await broker.ledger.getLedger();
+      console.log("✅ Warrior attributes - Ledger account exists");
+    } catch (error: any) {
+      console.log("⚠️  Warrior attributes - Ledger account does not exist, creating...");
+      try {
+        await broker.ledger.addLedger(0.1);
+        console.log("✅ Warrior attributes - Ledger created successfully");
+      } catch (createError: any) {
+        if (createError.message && createError.message.includes('Ledger already exists')) {
+          console.log("ℹ️  Warrior attributes - Ledger already exists, continuing...");
+        } else {
+          throw createError;
+        }
+      }
     }
     
     // Step 4: Select provider and acknowledge
@@ -165,7 +175,7 @@ REQUIREMENTS:
 5. DO NOT include any explanatory text before or after the JSON.
 
 EXACT OUTPUT FORMAT REQUIRED:
-{"Strength": 8241, "Wit": 5921, "Charisma": 7392, "Defence": 3519, "Luck": 4678, "strike_attack": "Galactic Smash", "taunt_attack": "Rocket Science", "dodge": "Tesla Tango", "recover": "Mars Recharge", "special_move": "PayPal Payload"}
+{"Strength": <value>, "Wit": <value>, "Charisma": <value>, "Defence": <value>, "Luck": <value>, "strike_attack": "Galactic Smash", "taunt_attack": "Rocket Science", "dodge": "Tesla Tango", "recover": "Mars Recharge", "special_move": "PayPal Payload"}
 
 CRITICAL: Return ONLY the JSON object. NO other text, explanations, or formatting.`;
 
@@ -192,10 +202,20 @@ export async function generateWarriorTraitsAndMoves(personalityAttributes: any):
     
     // Step 3: Check/Setup ledger account
     try {
-      await broker.ledger.getLedger();
-    } catch (error) {
-      console.log("⚠️  Ledger account does not exist, creating...");
-      await broker.ledger.addLedger(0.1);
+      const existingLedger = await broker.ledger.getLedger();
+      console.log("✅ Warrior traits - Ledger account exists");
+    } catch (error: any) {
+      console.log("⚠️  Warrior traits - Ledger account does not exist, creating...");
+      try {
+        await broker.ledger.addLedger(0.1);
+        console.log("✅ Warrior traits - Ledger created successfully");
+      } catch (createError: any) {
+        if (createError.message && createError.message.includes('Ledger already exists')) {
+          console.log("ℹ️  Warrior traits - Ledger already exists, continuing...");
+        } else {
+          throw createError;
+        }
+      }
     }
     
     // Step 4: Select provider and acknowledge
@@ -305,6 +325,220 @@ export async function generateWarriorTraitsAndMoves(personalityAttributes: any):
     
   } catch (error: any) {
     console.error("❌ Failed to generate warrior traits and moves:", error.message);
+    throw error;
+  }
+}
+
+// Function to create battle moves query with game state
+function createBattleMovesQuery(battlePrompt: any): string {
+  const basePrompt = `You are an ELITE strategic battle AI controlling two warriors. You must make INTELLIGENT, CALCULATED decisions based on warrior traits, personality, and battle conditions. This is NOT random - every choice must be strategically optimal!
+
+🔥 BATTLE STATUS 🔥
+Round: ${battlePrompt.current_round}/5 | Agent 1 DMG: ${battlePrompt.agent_1.total_damage_received} | Agent 2 DMG: ${battlePrompt.agent_2.total_damage_received}
+
+⚔️ WARRIOR ANALYSIS ⚔️
+=== AGENT 1 ===
+Personality: ${Array.isArray(battlePrompt.agent_1.personality.adjectives) ? battlePrompt.agent_1.personality.adjectives.join(', ') : battlePrompt.agent_1.personality.adjectives}
+Knowledge: ${Array.isArray(battlePrompt.agent_1.personality.knowledge_areas) ? battlePrompt.agent_1.personality.knowledge_areas.join(', ') : battlePrompt.agent_1.personality.knowledge_areas}
+STATS: STR:${battlePrompt.agent_1.traits.Strength} | WIT:${battlePrompt.agent_1.traits.Wit} | CHA:${battlePrompt.agent_1.traits.Charisma} | DEF:${battlePrompt.agent_1.traits.Defence} | LUCK:${battlePrompt.agent_1.traits.Luck}
+CONDITION: ${battlePrompt.agent_1.total_damage_received > 70 ? 'CRITICAL' : battlePrompt.agent_1.total_damage_received > 40 ? 'MODERATE' : 'HEALTHY'} (${battlePrompt.agent_1.total_damage_received}/100 damage)
+
+=== AGENT 2 ===
+Personality: ${Array.isArray(battlePrompt.agent_2.personality.adjectives) ? battlePrompt.agent_2.personality.adjectives.join(', ') : battlePrompt.agent_2.personality.adjectives}
+Knowledge: ${Array.isArray(battlePrompt.agent_2.personality.knowledge_areas) ? battlePrompt.agent_2.personality.knowledge_areas.join(', ') : battlePrompt.agent_2.personality.knowledge_areas}
+STATS: STR:${battlePrompt.agent_2.traits.Strength} | WIT:${battlePrompt.agent_2.traits.Wit} | CHA:${battlePrompt.agent_2.traits.Charisma} | DEF:${battlePrompt.agent_2.traits.Defence} | LUCK:${battlePrompt.agent_2.traits.Luck}
+CONDITION: ${battlePrompt.agent_2.total_damage_received > 70 ? 'CRITICAL' : battlePrompt.agent_2.total_damage_received > 40 ? 'MODERATE' : 'HEALTHY'} (${battlePrompt.agent_2.total_damage_received}/100 damage)
+
+🎯 STRATEGIC MOVE DECISION TREE 🎯
+FOR EACH WARRIOR, FOLLOW THIS LOGIC:
+
+1. SURVIVAL CHECK (Priority 1):
+   - If damage > 70: MUST choose RECOVER or desperate SPECIAL_MOVE
+   - If damage > 50 + personality includes defensive traits: RECOVER
+   
+2. EXPLOIT STRENGTHS (Priority 2):
+   - If STR > 8000 + aggressive personality: STRIKE or SPECIAL_MOVE
+   - If WIT > 8000 + cunning personality: TAUNT
+   - If CHA > 8000 + charismatic personality: TAUNT or RECOVER
+   - If DEF > 8000 + defensive personality: DODGE
+   - If LUCK > 8000 + risk-taking personality: SPECIAL_MOVE
+   
+3. PERSONALITY ALIGNMENT (Priority 3):
+   - "Aggressive", "Brutal", "Fierce" → STRIKE/SPECIAL_MOVE
+   - "Defensive", "Cautious", "Protective" → DODGE/RECOVER
+   - "Cunning", "Calculating", "Manipulative" → TAUNT
+   - "Lucky", "Fortunate", "Blessed" → SPECIAL_MOVE
+   - "Desperate", "Wounded" → RECOVER or final SPECIAL_MOVE
+   
+4. ROUND STRATEGY (Priority 4):
+   - Round 1-2: Build advantage (STRIKE if strong, TAUNT if clever)
+   - Round 3: Mid-game tactics (leverage best stats)
+   - Round 4-5: Finish strong (SPECIAL_MOVE if powerful, RECOVER if critical)
+
+🚫 FORBIDDEN DECISIONS 🚫
+- NO RECOVER when damage < 30 unless CHA > 8500
+- NO STRIKE when STR < 5000
+- NO ignoring extreme stats (>8500 must be used)
+- NO random choices - justify every decision
+
+MOVE EFFECTIVENESS:
+🗡️ STRIKE: STR-based damage (use if STR > 7000)
+⚡ SPECIAL_MOVE: All-stat ultimate (use if total > 35000 OR LUCK > 8000)
+🧠 TAUNT: WIT/CHA influence (use if WIT > 7000 OR CHA > 7000)
+🛡️ DODGE: DEF-based evasion (use if DEF > 7000)
+💚 RECOVER: CHA-based healing (use if damage > 50 OR CHA > 8000)
+
+ANALYZE EACH WARRIOR INDEPENDENTLY. MAKE OPTIMAL STRATEGIC CHOICES.
+
+OUTPUT: {"agent_1": "move_name", "agent_2": "move_name"}
+MOVES: strike, taunt, dodge, recover, special_move
+
+THINK STRATEGICALLY. EVERY CHOICE MUST BE OPTIMAL.`;
+
+  return basePrompt;
+}
+
+// New exported function for generating battle moves
+export async function generateBattleMoves(battlePrompt: any): Promise<string> {
+  console.log("🚀 Generating battle moves with 0G AI");
+  console.log(`💬 Battle Prompt:`, battlePrompt);
+  
+  try {
+    // Step 1: Initialize wallet and provider with Arena Contract AI Signer
+    const privateKey = process.env.PRIVATE_KEY || "0x5d9626839c7c44143e962b012eba09d8212cf7e3ab7a393c6c27cc5eb2be8765";
+    if (!privateKey) {
+      throw new Error('PRIVATE_KEY is required for arena contract signatures');
+    }
+    
+    const provider = new ethers.JsonRpcProvider("https://evmrpc-testnet.0g.ai");
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    // Step 2: Create broker instance
+    const broker = await createZGComputeNetworkBroker(wallet);
+    
+    // Step 3: Check/Setup ledger account
+    try {
+      const existingLedger = await broker.ledger.getLedger();
+      console.log("✅ Battle moves - Ledger account exists with balance:", existingLedger);
+    } catch (error: any) {
+      console.log("⚠️  Battle moves - Ledger account does not exist, creating...");
+      try {
+        await broker.ledger.addLedger(0.1);
+        console.log("✅ Battle moves - Ledger created successfully");
+      } catch (createError: any) {
+        if (createError.message && createError.message.includes('Ledger already exists')) {
+          console.log("ℹ️  Battle moves - Ledger already exists, continuing...");
+        } else {
+          throw createError;
+        }
+      }
+    }
+    
+    // Step 4: Select provider and acknowledge
+    const selectedProvider = OFFICIAL_PROVIDERS["llama-3.3-70b-instruct"];
+    
+    try {
+      await broker.inference.acknowledgeProviderSigner(selectedProvider);
+    } catch (error: any) {
+      if (!error.message.includes('already acknowledged')) {
+        throw error;
+      }
+    }
+    
+    // Step 5: Get service metadata
+    const { endpoint, model } = await broker.inference.getServiceMetadata(selectedProvider);
+    
+    // Step 6: Generate authentication headers
+    const query = createBattleMovesQuery(battlePrompt);
+    const headers = await broker.inference.getRequestHeaders(selectedProvider, query);
+    
+    // Step 7: Send query to AI service
+    const openai = new OpenAI({
+      baseURL: endpoint,
+      apiKey: "", // Empty string as per 0G docs
+    });
+    
+    // Prepare headers for OpenAI client
+    const requestHeaders: Record<string, string> = {};
+    Object.entries(headers).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        requestHeaders[key] = value;
+      }
+    });
+    
+    // Send the query
+    const completion = await openai.chat.completions.create(
+      {
+        messages: [{ role: "user", content: query }],
+        model: model,
+      },
+      {
+        headers: requestHeaders,
+      }
+    );
+    
+    const aiResponse = completion.choices[0].message.content;
+    const chatId = completion.id;
+    
+    console.log("✅ AI query completed successfully");
+    console.log(`🆔 Chat ID: ${chatId}`);
+    
+    // Step 8: Process response and handle payment
+    try {
+      await broker.inference.processResponse(
+        selectedProvider,
+        aiResponse || "",
+        chatId
+      );
+    } catch (paymentError: any) {
+      console.log("⚠️  Payment processing failed, but continuing...");
+    }
+    
+    // Validate and return the response
+    const trimmedResponse = (aiResponse || "").trim();
+    const isPureJSON = trimmedResponse.startsWith('{') && trimmedResponse.endsWith('}');
+    
+    if (!isPureJSON) {
+      console.log("⚠️  Response is not pure JSON format, attempting to extract JSON...");
+      // Try to extract JSON from the response
+      const jsonMatch = trimmedResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const extractedJson = jsonMatch[0];
+        console.log("✅ Extracted JSON from response");
+        return extractedJson;
+      }
+    }
+    
+    // Validate JSON structure for battle moves
+    try {
+      const parsedResponse = JSON.parse(trimmedResponse);
+      const requiredFields = ['agent_1', 'agent_2'];
+      const missingFields = requiredFields.filter(field => !parsedResponse.hasOwnProperty(field));
+      
+      if (missingFields.length === 0) {
+        console.log("✅ Response contains all required JSON fields for battle moves");
+        
+        // Validate moves are valid
+        const validMoves = ['strike', 'taunt', 'dodge', 'recover', 'special_move'];
+        const agent1Move = parsedResponse.agent_1.toLowerCase();
+        const agent2Move = parsedResponse.agent_2.toLowerCase();
+        
+        if (validMoves.includes(agent1Move) && validMoves.includes(agent2Move)) {
+          console.log("✅ All moves are valid");
+          return trimmedResponse;
+        } else {
+          throw new Error(`Invalid moves selected: Agent 1: ${agent1Move}, Agent 2: ${agent2Move}`);
+        }
+      } else {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+    } catch (jsonError) {
+      console.log("❌ Response is not valid JSON format");
+      throw new Error(`Invalid JSON response: ${jsonError}`);
+    }
+    
+  } catch (error: any) {
+    console.error("❌ Failed to generate battle moves:", error.message);
     throw error;
   }
 }

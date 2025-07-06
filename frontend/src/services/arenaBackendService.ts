@@ -1,6 +1,6 @@
 // Backend service for synchronized arena automation
 import { ethers } from 'ethers';
-import { KurukshetraAbi } from '../constants';
+import { ArenaAbi } from '../constants';
 
 interface ArenaGameState {
   battleId: number | null;
@@ -19,7 +19,7 @@ class ArenaBackendService {
   private intervals: Map<string, NodeJS.Timeout> = new Map();
   private provider: ethers.providers.JsonRpcProvider;
   private gameMasterWallet: ethers.Wallet;
-  private kurukshetraContract: ethers.Contract;
+  private arenaContract: ethers.Contract;
 
   constructor() {
     // Initialize provider and game master wallet
@@ -35,14 +35,14 @@ class ArenaBackendService {
     this.gameMasterWallet = new ethers.Wallet(gameMasterPrivateKey, this.provider);
     
     // Initialize contract (address will need to be provided)
-    const contractAddress = process.env.NEXT_PUBLIC_KURUKSHETRA_CONTRACT_ADDRESS;
+    const contractAddress = process.env.NEXT_PUBLIC_ARENA_CONTRACT_ADDRESS;
     if (!contractAddress) {
       throw new Error('Kurukshetra contract address not found');
     }
     
-    this.kurukshetraContract = new ethers.Contract(
+    this.arenaContract = new ethers.Contract(
       contractAddress,
-      KurukshetraAbi,
+      ArenaAbi,
       this.gameMasterWallet
     );
   }
@@ -112,7 +112,7 @@ class ArenaBackendService {
       console.log(`Auto-starting game for battle ${battleId}`);
       
       // Call the smart contract to start the game
-      const tx = await this.kurukshetraContract.startGame(state.battleId);
+      const tx = await this.arenaContract.startGame(state.battleId);
       await tx.wait();
 
       // Update game state
@@ -172,7 +172,7 @@ class ArenaBackendService {
       console.log(`Auto-calling next round for battle ${battleId}`);
       
       // Call the smart contract for next round
-      const tx = await this.kurukshetraContract.nextRound(state.battleId);
+      const tx = await this.arenaContract.nextRound(state.battleId);
       await tx.wait();
 
     } catch (error) {
@@ -187,7 +187,7 @@ class ArenaBackendService {
       if (!state || !state.battleId) return 'finished';
 
       // Call contract to check if game is finished
-      const battleInfo = await this.kurukshetraContract.getBattleInfo(state.battleId);
+      const battleInfo = await this.arenaContract.getBattleInfo(state.battleId);
       
       // Assuming the contract has a status field or similar
       if (battleInfo.isFinished || battleInfo.winner !== 0) {

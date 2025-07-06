@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useAccount, useWriteContract, useWatchContractEvent } from 'wagmi';
 import { encodePacked, keccak256, decodeEventLog } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -11,7 +12,7 @@ import { Button } from '../../components/ui/button';
 // import { Badge } from '../../components/ui/badge';
 import { useArenas, type RankCategory, type ArenaWithDetails } from '../../hooks/useArenas';
 import { arenaService, isValidBettingAmount, getClosestValidBettingAmount } from '../../services/arenaService';
-import { near_agent_move_selecter, KurukshetraAbi, chainsToContracts, warriorsNFTAbi } from '../../constants';
+import { ArenaAbi, chainsToContracts, warriorsNFTAbi } from '../../constants';
 import { waitForTransactionReceipt, readContract } from '@wagmi/core';
 import rainbowKitConfig from '../../rainbowKitConfig';
 import {
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react';
 import { GameTimer } from '../../components/GameTimer';
 import { useArenaSync } from '../../hooks/useArenaSync';
+import { useArenaMessages } from '../../hooks/useArenaMessages';
 
 // PlayerMoves enum mapping (based on Kurukshetra.sol)
 const PlayerMoves = {
@@ -141,7 +143,9 @@ interface Warriors {
   luck: number;
   owner: string;
   winnings: number;
-  // IPFS metadata fields for AI prompts
+  // 0G Storage metadata fields for AI prompts and display
+  bio?: string;
+  life_history?: string;
   adjectives?: string;
   knowledge_areas?: string;
 }
@@ -497,7 +501,7 @@ const EnhancedArenaCard = ({
   );
 };
 
-export default function KurukshetraPage() {
+export default function ArenaPage() {
   const { isConnected, address } = useAccount();
   const { arenasWithDetails, isLoading, error, refetch } = useArenas();
   const [selectedArena, setSelectedArena] = useState<Arena | null>(null);
@@ -532,6 +536,17 @@ export default function KurukshetraPage() {
 
   // Arena automation hook
   const arenaSync = useArenaSync(selectedArena?.address || null);
+
+  // Arena messages for engaging user experience
+  const { showMessage } = useArenaMessages({
+    isInitializing: isInitializing,
+    gameStarted: selectedArena?.state === 'BATTLE_ONGOING',
+    roundComplete: selectedArena?.currentRound !== undefined,
+    currentRound: selectedArena?.currentRound,
+    battleWon: selectedArena?.winner === 'ONE' || selectedArena?.winner === 'TWO',
+    selectedArena: selectedArena,
+    gameState: selectedArena?.state
+  });
 
   // Function to fetch move names from WarriorsNFT contract
   const fetchWarriorsMoves = useCallback(async (tokenId: number): Promise<WarriorsMoves | null> => {
@@ -653,16 +668,10 @@ export default function KurukshetraPage() {
         const warriorsOneMove = getMoveEnum(normalizedWarriorsOneMove);
         const warriorsTwoMove = getMoveEnum(normalizedWarriorsTwoMove);
 
-        console.log('Move enums:', { warriorsOneMove, warriorsTwoMove });      // Get game master private key from environment
-      const gameStandardPrivateKey = process.env.NEXT_PUBLIC_GAME_MASTER_PRIVATE_KEY;
-      if (!gameStandardPrivateKey) {
-        throw new Error('Game master private key not found');
-      }
-
-      // Ensure private key has 0x prefix for viem
-      const formattedPrivateKey = gameStandardPrivateKey.startsWith('0x') 
-        ? gameStandardPrivateKey 
-        : `0x${gameStandardPrivateKey}`;
+        console.log('Move enums:', { warriorsOneMove, warriorsTwoMove });
+        
+      // Use the same AI signer private key for consistency
+      const aiSignerPrivateKey = "0x5d9626839c7c44143e962b012eba09d8212cf7e3ab7a393c6c27cc5eb2be8765";
 
       // Pack data for signing - ONLY the moves (as per contract: abi.encodePacked(_warriorsOneMove, _warriorsTwoMove))
       const dataToSign = encodePacked(
@@ -672,9 +681,9 @@ export default function KurukshetraPage() {
       
       const dataHash = keccak256(dataToSign);
       
-      // Sign with game master private key (this will automatically add the Ethereum message prefix)
-      const gameStandardAccount = privateKeyToAccount(formattedPrivateKey as `0x${string}`);
-      const signature = await gameStandardAccount.signMessage({
+      // Sign with AI signer private key (this will automatically add the Ethereum message prefix)
+      const aiSignerAccount = privateKeyToAccount(aiSignerPrivateKey as `0x${string}`);
+      const signature = await aiSignerAccount.signMessage({
         message: { raw: dataHash }
       });
 
@@ -700,16 +709,16 @@ export default function KurukshetraPage() {
         },
       });
 
-      const gameMasterWalletClient = createWalletClient({
-        account: gameStandardAccount,
+      const aiSignerWalletClient = createWalletClient({
+        account: aiSignerAccount,
         chain: flowTestnet,
         transport: http('https://testnet.evm.nodes.onflow.org'),
       });
 
-      // Call the battle function using Game Master's wallet client
-      const hash = await gameMasterWalletClient.writeContract({
+      // Call the battle function using AI signer's wallet client
+      const hash = await aiSignerWalletClient.writeContract({
         address: selectedArena.address as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'battle',
         args: [warriorsOneMove, warriorsTwoMove, signature]
       });
@@ -735,7 +744,7 @@ export default function KurukshetraPage() {
         const moveExecutedEvents = receipt.logs.filter(log => {
           try {
             const decodedLog = decodeEventLog({
-              abi: KurukshetraAbi,
+              abi: ArenaAbi,
               data: log.data,
               topics: log.topics,
             });
@@ -754,7 +763,7 @@ export default function KurukshetraPage() {
         moveExecutedEvents.forEach((log) => {
           try {
             const decodedLog = decodeEventLog({
-              abi: KurukshetraAbi,
+              abi: ArenaAbi,
               data: log.data,
               topics: log.topics,
             });
@@ -810,6 +819,186 @@ export default function KurukshetraPage() {
 
     } catch (error) {
       console.error('Error executing battle moves:', error);
+    }
+  };
+
+  // Execute battle with pre-generated signature from API
+  const executeBattleWithSignature = async (params: {
+    signature: string;
+    warriorsOneMove: number;
+    warriorsTwoMove: number;
+    agent1Move: string;
+    agent2Move: string;
+  }) => {
+    if (!selectedArena || !address) {
+      console.error('No arena selected or user not connected');
+      return;
+    }
+
+    try {
+      console.log('🔐 Executing battle with API signature:', params);
+
+      // Get display move names (same as executeBattleMoves)
+      const normalizedWarriorsOneMove = normalizeMoveName(params.agent1Move) as PlayerMove;
+      const normalizedWarriorsTwoMove = normalizeMoveName(params.agent2Move) as PlayerMove;
+      
+      const warriorsOneMoveName = warriorsMovesCache.warriorsOne 
+        ? getSpecificMoveName(warriorsMovesCache.warriorsOne, normalizedWarriorsOneMove)
+        : `${normalizedWarriorsOneMove} (${normalizedWarriorsOneMove})`;
+      
+      const warriorsTwoMoveName = warriorsMovesCache.warriorsTwo 
+        ? getSpecificMoveName(warriorsMovesCache.warriorsTwo, normalizedWarriorsTwoMove)
+        : `${normalizedWarriorsTwoMove} (${normalizedWarriorsTwoMove})`;
+
+      // Set battle notification
+      setBattleNotification({
+        isVisible: true,
+        warriorsOneName: selectedArena.warriorsOne?.name || 'Warriors One',
+        warriorsTwoName: selectedArena.warriorsTwo?.name || 'Warriors Two',
+        warriorsOneMove: warriorsOneMoveName,
+        warriorsTwoMove: warriorsTwoMoveName,
+        warriorsOneHitStatus: 'PENDING',
+        warriorsTwoHitStatus: 'PENDING'
+      });
+
+      // Create AI signer wallet client for transaction (using the same key as API)
+      const { createWalletClient, http } = await import('viem');
+      const { defineChain } = await import('viem');
+      const { privateKeyToAccount } = await import('viem/accounts');
+      
+      const flowTestnet = defineChain({
+        id: 545,
+        name: 'Flow Testnet',
+        network: 'flow-testnet',
+        nativeCurrency: {
+          decimals: 18,
+          name: 'Flow',
+          symbol: 'FLOW',
+        },
+        rpcUrls: {
+          default: {
+            http: ['https://testnet.evm.nodes.onflow.org'],
+          },
+        },
+      });
+
+      // Use the same AI signer private key as the API
+      const aiSignerPrivateKey = "0x5d9626839c7c44143e962b012eba09d8212cf7e3ab7a393c6c27cc5eb2be8765";
+      const aiSignerAccount = privateKeyToAccount(aiSignerPrivateKey as `0x${string}`);
+
+      const aiSignerWalletClient = createWalletClient({
+        account: aiSignerAccount,
+        chain: flowTestnet,
+        transport: http('https://testnet.evm.nodes.onflow.org'),
+      });
+
+      // Call the battle function using AI signer wallet client with the pre-generated signature
+      const hash = await aiSignerWalletClient.writeContract({
+        address: selectedArena.address as `0x${string}`,
+        abi: ArenaAbi,
+        functionName: 'battle',
+        args: [params.warriorsOneMove, params.warriorsTwoMove, params.signature]
+      });
+
+      console.log('🔐 Battle transaction sent with API signature:', hash);
+
+      // Wait for confirmation
+      const { createPublicClient } = await import('viem');
+      const publicClient = createPublicClient({
+        chain: flowTestnet,
+        transport: http('https://testnet.evm.nodes.onflow.org'),
+      });
+
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: hash as `0x${string}`,
+        timeout: 60000
+      });
+
+      console.log('✅ Battle confirmed in block:', receipt.blockNumber);
+      
+      // Process battle events (same as executeBattleMoves)
+      try {
+        const { decodeEventLog } = await import('viem');
+        const moveExecutedEvents = receipt.logs.filter(log => {
+          try {
+            const decodedLog = decodeEventLog({
+              abi: ArenaAbi,
+              data: log.data,
+              topics: log.topics,
+            });
+            return decodedLog.eventName === 'WarriorsMoveExecuted';
+          } catch {
+            return false;
+          }
+        });
+
+        console.log('🎯 WarriorsMoveExecuted events found:', moveExecutedEvents.length);
+        
+        let warriorsOneHitStatus: 'HIT' | 'MISS' = 'MISS';
+        let warriorsTwoHitStatus: 'HIT' | 'MISS' = 'MISS';
+        
+        moveExecutedEvents.forEach((log) => {
+          try {
+            const decodedLog = decodeEventLog({
+              abi: ArenaAbi,
+              data: log.data,
+              topics: log.topics,
+            });
+            
+            if (decodedLog.eventName === 'WarriorsMoveExecuted') {
+              const { args } = decodedLog;
+              const eventArgs = args as any;
+              const damageOnOpponentWarriors = eventArgs.damageOnOpponentWarriors;
+              const recoveryOnSelfWarriors = eventArgs.recoveryOnSelfWarriors;
+              const dodged = eventArgs.dodged;
+              
+              const isHit = damageOnOpponentWarriors > 0 || recoveryOnSelfWarriors > 0 || dodged === true;
+              
+              if (moveExecutedEvents.indexOf(log) === 0) {
+                warriorsOneHitStatus = isHit ? 'HIT' : 'MISS';
+              } else {
+                warriorsTwoHitStatus = isHit ? 'HIT' : 'MISS';
+              }
+              
+              console.log(`📊 Move result - Damage: ${damageOnOpponentWarriors}, Recovery: ${recoveryOnSelfWarriors}, Dodged: ${dodged} = ${isHit ? 'HIT' : 'MISS'}`);
+            }
+          } catch (error) {
+            console.error('Error decoding WarriorsMoveExecuted event:', error);
+          }
+        });
+
+        // Update battle notification with HIT/MISS status
+        setBattleNotification(prev => prev ? {
+          ...prev,
+          warriorsOneHitStatus,
+          warriorsTwoHitStatus
+        } : null);
+
+        console.log(`🎯 Final hit status - ${selectedArena.warriorsOne?.name}: ${warriorsOneHitStatus}, ${selectedArena.warriorsTwo?.name}: ${warriorsTwoHitStatus}`);
+      } catch (eventError) {
+        console.error('Error processing battle events:', eventError);
+      }
+
+      // Hide notification after 8 seconds
+      setTimeout(() => {
+        setBattleNotification(null);
+      }, 8000);
+      
+      // Refresh arena data to get updated state
+      console.log('🔄 Refreshing arena data after battle execution...');
+      await refetch();
+      
+      console.log('✅ Battle execution with API signature completed successfully');
+      
+    } catch (error) {
+      console.error('❌ Failed to execute battle with API signature:', error);
+      
+      // Update notification with error
+      setBattleNotification(prev => prev ? {
+        ...prev,
+        warriorsOneHitStatus: 'MISS',
+        warriorsTwoHitStatus: 'MISS'
+      } : null);
     }
   };
 
@@ -874,6 +1063,8 @@ export default function KurukshetraPage() {
         luck: details.warriorsOneDetails.traits.luck ?? 50,
         owner: '0x000...000',
         winnings: 0,
+        bio: details.warriorsOneDetails.bio,
+        life_history: details.warriorsOneDetails.life_history,
         adjectives: details.warriorsOneDetails.adjectives,
         knowledge_areas: details.warriorsOneDetails.knowledge_areas
       };
@@ -890,6 +1081,8 @@ export default function KurukshetraPage() {
         luck: details.warriorsTwoDetails.traits.luck ?? 50,
         owner: '0x000...000',
         winnings: 0,
+        bio: details.warriorsTwoDetails.bio,
+        life_history: details.warriorsTwoDetails.life_history,
         adjectives: details.warriorsTwoDetails.adjectives,
         knowledge_areas: details.warriorsTwoDetails.knowledge_areas
       };
@@ -1024,6 +1217,8 @@ export default function KurukshetraPage() {
         luck: details.warriorsTwoDetails.traits.luck ?? 50, // Using luck as personality
         owner: '0x000...000', // You may want to fetch actual owner from contract
         winnings: 0, // You may want to fetch actual winnings
+        bio: details.warriorsTwoDetails.bio,
+        life_history: details.warriorsTwoDetails.life_history,
         adjectives: details.warriorsTwoDetails.adjectives,
         knowledge_areas: details.warriorsTwoDetails.knowledge_areas
       };
@@ -1039,6 +1234,13 @@ export default function KurukshetraPage() {
 
   const handleStartGame = useCallback(async (isAutomated: boolean = false) => {
     if (!selectedArena) return;
+
+    // Trigger warrior message for game start
+    showMessage({
+      id: 'game_starting',
+      text: "Let the games begin! May the strongest warrior claim victory and eternal glory, Chief!",
+      duration: 6000
+    });
 
     try {
       console.log('Starting battle for arena using Game Master private key:', selectedArena.address);
@@ -1087,7 +1289,7 @@ export default function KurukshetraPage() {
       // Call startGame using Game Master's wallet client
       const hash = await gameMasterWalletClient.writeContract({
         address: selectedArena.address as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'startGame',
         args: []
       });
@@ -1126,7 +1328,7 @@ export default function KurukshetraPage() {
               // Game was reset due to insufficient bets, notify backend to stop automation
               console.log('⚠️ Game was reset (insufficient bets) - stopping automation');
               
-              const response = await fetch(`/api/arena/commands?battleId=${selectedArena.address}`, {
+              const response = await fetch(`http://localhost:3002/api/arena/commands?battleId=${selectedArena.address}`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -1253,6 +1455,13 @@ export default function KurukshetraPage() {
       });
 
       console.log('Bet confirmed!');
+
+      // Trigger warrior message for successful bet
+      showMessage({
+        id: 'bet_placed',
+        text: `A wise wager, Chief! Thy ${betAmount} CRwN shall multiply if thy chosen champion proves victorious!`,
+        duration: 5000
+      });
 
       // Note: In a real app you might want to update the arena state
       // For now, we'll just close the modal and reset the form
@@ -1405,6 +1614,13 @@ export default function KurukshetraPage() {
       setIsInitializing(true);
       setInitializationError(null);
 
+      // Trigger warrior message for arena initialization
+      showMessage({
+        id: 'arena_initializing',
+        text: "By the ancient gods! A new Arena is being forged in the fires of battle! Witness its birth, Chief!",
+        duration: 5000
+      });
+
       console.log(`Initializing arena ${selectedArena.address} with Warriors One: ${warriorsOneNFTId}, Warriors Two: ${warriorsTwoNFTId}`);
 
       // Call the smart contract function
@@ -1449,7 +1665,11 @@ export default function KurukshetraPage() {
           wit: updatedArenaDetails.warriorsOneDetails.traits.wit ?? 50,
           luck: updatedArenaDetails.warriorsOneDetails.traits.luck ?? 50,
           owner: '0x000...000',
-          winnings: 0
+          winnings: 0,
+          bio: updatedArenaDetails.warriorsOneDetails.bio,
+          life_history: updatedArenaDetails.warriorsOneDetails.life_history,
+          adjectives: updatedArenaDetails.warriorsOneDetails.adjectives,
+          knowledge_areas: updatedArenaDetails.warriorsOneDetails.knowledge_areas
         };
 
         updatedArena.warriorsTwo = {
@@ -1463,7 +1683,11 @@ export default function KurukshetraPage() {
           wit: updatedArenaDetails.warriorsTwoDetails.traits.wit ?? 50,
           luck: updatedArenaDetails.warriorsTwoDetails.traits.luck ?? 50,
           owner: '0x000...000',
-          winnings: 0
+          winnings: 0,
+          bio: updatedArenaDetails.warriorsTwoDetails.bio,
+          life_history: updatedArenaDetails.warriorsTwoDetails.life_history,
+          adjectives: updatedArenaDetails.warriorsTwoDetails.adjectives,
+          knowledge_areas: updatedArenaDetails.warriorsTwoDetails.knowledge_areas
         };
       }
 
@@ -1608,56 +1832,23 @@ export default function KurukshetraPage() {
 
       console.log('Battle prompt data:', battlePrompt);
 
-      // Pass only the JSON directly as the prompt since AI is configured to output JSON
-      const promptString = JSON.stringify(battlePrompt);
-
-      // Use the pre-made auth token from environment variable
-      const authKey = process.env.NEXT_PUBLIC_AUTH_KEY;
-      if (!authKey) {
-        console.error('NEXT_PUBLIC_AUTH_KEY not found in environment variables');
-        return;
-      }
-
-      let authData;
-      try {
-        authData = JSON.parse(authKey);
-      } catch (error) {
-        console.error('Failed to parse NEXT_PUBLIC_AUTH_KEY:', error);
-        return;
-      }
-
-      // Convert auth to the format expected by the API (matching warrior minter pattern)
-      const authForApi = {
-        signature: authData.signature,
-        account_id: authData.account_id,
-        public_key: authData.public_key,
-        message: authData.message,
-        nonce: authData.nonce,
-        recipient: authData.recipient,
-        callback_url: authData.callback_url
-      };
-
-      // Call our backend API route for NEAR AI move selection
-      console.log('🕐 Starting NEAR AI API call at:', new Date().toLocaleTimeString());
-      console.log('Sending request to /api/near-ai-moves with:', {
-        auth: authForApi,
-        prompt: promptString,
-        assistantId: near_agent_move_selecter
+      // Call our backend API route for 0G AI move selection
+      console.log('🕐 Starting 0G AI API call at:', new Date().toLocaleTimeString());
+      console.log('Sending request to /api/generate-battle-moves with:', {
+        battlePrompt: battlePrompt
       });
 
-      const response = await fetch('/api/near-ai-moves', {
+      const response = await fetch('/api/generate-battle-moves', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          auth: authForApi,
-          prompt: promptString,
-          assistantId: near_agent_move_selecter // Use the move selector from constants
+          battlePrompt: battlePrompt
         })
       });
 
-      console.log('🕐 NEAR AI API response received at:', new Date().toLocaleTimeString());
+      console.log('🕐 0G AI API response received at:', new Date().toLocaleTimeString());
       console.log('Response status:', response.status, response.statusText);
 
       if (!response.ok) {
@@ -1670,10 +1861,10 @@ export default function KurukshetraPage() {
       console.log('Raw API response:', data);
 
       if (!data.success) {
-        throw new Error(data.error || 'Unknown error from NEAR AI move selector');
+        throw new Error(data.error || 'Unknown error from 0G AI move selector');
       }
 
-      console.log("NEAR AI Move Selector Response:", data.response);      // Parse the AI response to extract moves and execute battle
+      console.log("0G AI Move Selector Response:", data.response);      // Parse the AI response to extract moves and execute battle
       try {
         const aiResponse = JSON.parse(data.response);
         console.log('Parsed AI response:', aiResponse);
@@ -1716,11 +1907,26 @@ export default function KurukshetraPage() {
         if (agent1Move && agent2Move) {
           console.log(`Agent 1 move: ${agent1Move}, Agent 2 move: ${agent2Move}`);
           
-          // Execute the battle with the AI-selected moves
-          await executeBattleMoves({
-            agent_1: { move: agent1Move },
-            agent_2: { move: agent2Move }
-          });
+          // Use the signature from the API directly instead of generating a new one
+          if (data.signature && data.contractMoves) {
+            console.log('🔐 Using API-generated signature for contract battle');
+            
+            // Execute battle directly with the API-provided signature
+            await executeBattleWithSignature({
+              signature: data.signature,
+              warriorsOneMove: data.contractMoves.warriorsOneMove,
+              warriorsTwoMove: data.contractMoves.warriorsTwoMove,
+              agent1Move,
+              agent2Move
+            });
+          } else {
+            // Fallback to old method if signature not available
+            console.log('⚠️ No signature in API response, using fallback method');
+            await executeBattleMoves({
+              agent_1: { move: agent1Move },
+              agent_2: { move: agent2Move }
+            });
+          }
         } else {
           console.error('Invalid AI response format - missing moves');
           console.error('Expected format 1: {"agent_1": {"move": "strike"}, "agent_2": {"move": "dodge"}}');
@@ -1757,7 +1963,7 @@ export default function KurukshetraPage() {
 
     const pollForCommands = async () => {
       try {
-        const response = await fetch(`/api/arena/commands?battleId=${selectedArena.address}`);
+        const response = await fetch(`http://localhost:3002/api/arena/commands?battleId=${selectedArena.address}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -1811,7 +2017,7 @@ export default function KurukshetraPage() {
   // Event listeners for battle events using wagmi
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'RoundOver',
     onLogs(logs) {
       console.log('RoundOver event received:', logs);
@@ -1822,7 +2028,7 @@ export default function KurukshetraPage() {
 
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'GameFinished',
     onLogs(logs) {
       console.log('GameFinished event received:', logs);
@@ -1868,7 +2074,7 @@ export default function KurukshetraPage() {
 
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'GameStarted',
     onLogs(logs) {
       console.log('GameStarted event received:', logs);
@@ -1881,7 +2087,7 @@ export default function KurukshetraPage() {
   // Listen for influence events to refresh costs
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'WarriorsOneInfluenced',
     onLogs(logs) {
       console.log('WarriorsOneInfluenced event received:', logs);
@@ -1892,7 +2098,7 @@ export default function KurukshetraPage() {
 
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'WarriorsOneDefluenced',
     onLogs(logs) {
       console.log('WarriorsOneDefluenced event received:', logs);
@@ -1903,7 +2109,7 @@ export default function KurukshetraPage() {
 
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'WarriorsTwoInfluenced',
     onLogs(logs) {
       console.log('WarriorsTwoInfluenced event received:', logs);
@@ -1914,7 +2120,7 @@ export default function KurukshetraPage() {
 
   useWatchContractEvent({
     address: selectedArena?.address as `0x${string}`,
-    abi: KurukshetraAbi,
+    abi: ArenaAbi,
     eventName: 'WarriorsTwoDefluenced',
     onLogs(logs) {
       console.log('WarriorsTwoDefluenced event received:', logs);
@@ -1953,7 +2159,7 @@ export default function KurukshetraPage() {
               className="text-2xl text-orange-400 mb-4 arcade-glow"
               style={ { fontFamily: 'Press Start 2P, monospace' } }
             >
-              KURUKSHETRA
+              Warriors AI-rena
             </h1>
             <p
               className="text-orange-400 mb-6"
@@ -2002,7 +2208,7 @@ export default function KurukshetraPage() {
               className="text-2xl text-orange-400 mb-4 arcade-glow"
               style={ { fontFamily: 'Press Start 2P, monospace' } }
             >
-              KURUKSHETRA
+              Warriors AI-rena
             </h1>
             <p
               className="text-orange-400 mb-6"
@@ -2054,7 +2260,7 @@ export default function KurukshetraPage() {
               fontFamily: 'Press Start 2P, monospace'
             } }
           >
-            KURUKSHETRA
+            Warriors AI-rena
           </h1>
           <div
             className="arcade-border p-4 mx-auto max-w-3xl"
@@ -2308,950 +2514,1042 @@ const ArenaModal = ({
   manualStartGame?: () => Promise<void>;
   manualNextRound?: () => Promise<void>;
 }) => {
+  // Tooltip state management
+  const [tooltipState, setTooltipState] = useState<{
+    isVisible: boolean;
+    warrior: 'ONE' | 'TWO' | null;
+    position: { x: number; y: number };
+  }>({
+    isVisible: false,
+    warrior: null,
+    position: { x: 0, y: 0 }
+  });
+
+  // Handle tooltip show/hide
+  const showTooltip = (warrior: 'ONE' | 'TWO', event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltipState({
+      isVisible: true,
+      warrior,
+      position: {
+        x: rect.right + 10, // Position to the right of the icon
+        y: rect.top
+      }
+    });
+  };
+
+  const hideTooltip = () => {
+    setTooltipState({
+      isVisible: false,
+      warrior: null,
+      position: { x: 0, y: 0 }
+    });
+  };
+
+  // Portal tooltip component
+  const TooltipPortal = () => {
+    if (!tooltipState.isVisible || !tooltipState.warrior) return null;
+    
+    const warrior = tooltipState.warrior === 'ONE' ? arena.warriorsOne : arena.warriorsTwo;
+    if (!warrior) return null;
+
+    const tooltipContent = (
+      <div 
+        className="fixed w-64 p-3 bg-black bg-opacity-95 text-white text-xs rounded-lg border border-orange-400 shadow-2xl pointer-events-none"
+        style={{ 
+          fontFamily: 'monospace', 
+          zIndex: 2147483647,
+          left: tooltipState.position.x,
+          top: tooltipState.position.y,
+          transform: tooltipState.position.x > window.innerWidth - 300 ? 'translateX(-100%)' : 'none'
+        }}
+      >
+        <div className="mb-2">
+          <span className="text-orange-400 font-bold">Bio:</span>
+          <div>{warrior.bio || 'No bio available'}</div>
+        </div>
+        <div className="mb-2">
+          <span className="text-orange-400 font-bold">Life History:</span>
+          <div>{warrior.life_history || 'No history available'}</div>
+        </div>
+        <div className="mb-2">
+          <span className="text-orange-400 font-bold">Personality:</span>
+          <div>{warrior.adjectives || 'No personality defined'}</div>
+        </div>
+        <div>
+          <span className="text-orange-400 font-bold">Knowledge Areas:</span>
+          <div>{warrior.knowledge_areas || 'No knowledge areas defined'}</div>
+        </div>
+      </div>
+    );
+
+    return typeof window !== 'undefined' ? createPortal(tooltipContent, document.body) : null;
+  };
+
   if (!isOpen) return null;
 
   const totalWarriorsOneBets = arena.playerOneBets.reduce((sum, bet) => sum + bet.amount, 0);
   const totalWarriorsTwoBets = arena.playerTwoBets.reduce((sum, bet) => sum + bet.amount, 0);
   const totalPot = totalWarriorsOneBets + totalWarriorsTwoBets;
+  
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div
-        className="max-w-7xl w-full max-h-[90vh] overflow-y-auto"
-        style={ {
-          background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-          border: '3px solid #ff8c00',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.3)',
-          borderRadius: '24px'
-        } }
-      >
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <h2
-              className="text-2xl text-orange-400 arcade-glow"
-              style={ { fontFamily: 'Press Start 2P, monospace' } }
-            >
-              { arena.rank } ARENA
-            </h2>
-            <button
-              onClick={ onClose }
-              className="text-orange-400 hover:text-orange-300 text-2xl transition-colors"
-              style={ { fontFamily: 'Press Start 2P, monospace' } }
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Battle State */}
-          <div className="text-center mb-6">
-            <div
-              className={ `${getStateColor(arena.state)} text-white text-sm px-4 py-2 rounded-lg inline-block` }
-              style={ { fontFamily: 'Press Start 2P, monospace' } }
-            >
-              { arena.state.replace('_', ' ') }
-            </div>
-            { arena.state === 'BATTLE_ONGOING' && (
-              <div className="mt-2">
-                <div
-                  className="text-orange-400"
-                  style={ { fontFamily: 'Press Start 2P, monospace' } }
-                >
-                  Round { arena.currentRound }/{ arena.maxRounds }
-                </div>
-                <div
-                  className="text-xs text-yellow-300 mt-2 max-w-md mx-auto leading-relaxed"
-                  style={ { fontFamily: 'Press Start 2P, monospace' } }
-                >
-                  Note: Players should only place bets after the round counter updates. NEAR AI's response, blockchain validation, and their synchronization with the timer above can sometimes vary.
-                </div>
-                <div
-                  className="text-sm text-blue-400 mt-1"
-                  style={ { fontFamily: 'Press Start 2P, monospace' } }
-                >
-                  Phase: { arena.battlePhase.replace('_', ' ') }
-                </div>
-              </div>
-            ) }
-          </div>
-
-          {/* Automation Status - Show when automation is active */}
-          {arenaSync?.gameState && (
-            <div className="mb-6">
-              <GameTimer
-                gameState={arenaSync.gameState.gameState || 'idle'}
-                timeRemaining={arenaSync.gameState.timeRemaining || 0}
-                totalTime={arenaSync.gameState.totalTime || 0}
-              />
-              
-              {/* Manual Override Buttons */}
-              {(arenaSync.gameState.gameState === 'betting' || arenaSync.gameState.gameState === 'playing') && (
-                <div className="mt-4 flex gap-4 justify-center">
-                  {arenaSync.gameState.gameState === 'betting' && manualStartGame && (
-                    <div className="text-center">
-                      <button
-                        onClick={manualStartGame}
-                        className="arcade-button px-4 py-2 text-sm"
-                        style={{ fontFamily: 'Press Start 2P, monospace' }}
-                      >
-                        START NOW
-                      </button>
-                      <div
-                        className="text-xs text-red-300 mt-2 max-w-xs mx-auto leading-relaxed"
-                        style={{ fontFamily: 'Press Start 2P, monospace' }}
-                      >
-                        This button is only to be used if the automation mechanism fails (timer gets to 0 and hangs there, or the timer is not visible). This is a manual override button and must not be used unless the above condition occurs, as this can break automation for this battle.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Automation Status */}
-              <div className="mt-2 text-center">
-                <div
-                  className="text-xs text-green-400"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  🤖 AUTOMATION ACTIVE
-                </div>
-                {arenaSync.error && (
-                  <div
-                    className="text-xs text-red-400 mt-1"
-                    style={{ fontFamily: 'Press Start 2P, monospace' }}
-                  >
-                    ⚠️ {arenaSync.error}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Arena Initialization Form - Only for EMPTY arenas and when not showing winner */}
-          { arena.state === 'EMPTY' && (!winnerDisplay || !winnerDisplay.isVisible) && (
-            <div
-              className="p-6 mb-6"
-              style={ {
-                background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                border: '2px solid #ff8c00',
-                backdropFilter: 'blur(15px)',
-                WebkitBackdropFilter: 'blur(15px)',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                borderRadius: '20px'
-              } }
-            >
-              <h3
-                className="text-orange-400 text-lg mb-6 text-center arcade-glow"
+    <>
+      <TooltipPortal />
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div
+          className="max-w-7xl w-full max-h-[90vh] overflow-y-auto"
+          style={ {
+            background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+            border: '3px solid #ff8c00',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.3)',
+            borderRadius: '24px'
+          } }
+        >
+          <div className="p-6">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+              <h2
+                className="text-2xl text-orange-400 arcade-glow"
                 style={ { fontFamily: 'Press Start 2P, monospace' } }
               >
-                Initialize Arena
-              </h3>
-              
-              <div className="grid gap-4">
-                <div>
-                  <label
-                    className="block text-orange-400 text-sm mb-3"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    Warriors One NFT ID
-                  </label>
-                  <input
-                    type="number"
-                    value={ warriorsOneNFTId }
-                    onChange={ (e) => setWarriorsOneNFTId(e.target.value) }
-                    className="w-full p-3 rounded text-white"
-                    style={ {
-                      background: 'rgba(120, 160, 200, 0.1)',
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      fontFamily: 'Press Start 2P, monospace'
-                    } }
-                    placeholder="Enter NFT ID for Warriors One"
-                    min="1"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className="block text-orange-400 text-sm mb-3"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    Warriors Two NFT ID
-                  </label>
-                  <input
-                    type="number"
-                    value={ warriorsTwoNFTId }
-                    onChange={ (e) => setWarriorsTwoNFTId(e.target.value) }
-                    className="w-full p-3 rounded text-white"
-                    style={ {
-                      background: 'rgba(120, 160, 200, 0.1)',
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)',
-                      fontFamily: 'Press Start 2P, monospace'
-                    } }
-                    placeholder="Enter NFT ID for Warriors Two"
-                    min="1"
-                  />
-                </div>
-              </div>
-
-              <div className="text-center space-y-4">
-                <div
-                  className="text-sm text-orange-400"
-                  style={ { fontFamily: 'Press Start 2P, monospace' } }
-                >
-                  Arena Details: <span className="text-orange-400">{ arena.rank }</span> •
-                  Bet Amount: <span className="text-orange-400">{ arena.betAmount } CRwN</span>
-                </div>
-
-                { initializationError && (
-                  <div
-                    className="text-red-400 text-xs p-3 rounded"
-                    style={ {
-                      fontFamily: 'Press Start 2P, monospace',
-                      background: 'rgba(255, 0, 0, 0.1)',
-                      border: '1px solid rgba(255, 0, 0, 0.3)',
-                      whiteSpace: 'pre-line',
-                      lineHeight: '1.6'
-                    } }
-                  >
-                    ⚠️ { initializationError }
-                  </div>
-                ) }
-
-                <button
-                  onClick={ onInitialize }
-                  className={ `arcade-button px-8 py-3 ${isInitializing ? 'opacity-50 cursor-not-allowed' : ''}` }
-                  disabled={ !warriorsOneNFTId || !warriorsTwoNFTId || isInitializing }
-                  style={ {
-                    fontFamily: 'Press Start 2P, monospace',
-                    borderRadius: '12px'
-                  } }
-                >
-                  { isInitializing ? 'INITIALIZING...' : 'INITIALIZE ARENA' }
-                </button>
-
-                { isInitializing && (
-                  <div
-                    className="text-orange-400 text-xs"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    ⚡ Transaction in progress... Please wait.
-                  </div>
-                ) }
-
-                { (!warriorsOneNFTId || !warriorsTwoNFTId) && !isInitializing && (
-                  <div
-                    className="text-red-400 text-xs"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    Please enter both Warriors NFT IDs to initialize the arena
-                  </div>
-                ) }
-              </div>
-            </div>
-          ) }
-
-          {/* Winner Display - Shows for 10 seconds after battle ends */}
-          {winnerDisplay && winnerDisplay.isVisible && (
-            <div className="mb-6 p-8 rounded-lg text-center bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border-4 border-yellow-400 shadow-2xl">
-              <div className="animate-bounce">
-                <div
-                  className="text-3xl text-yellow-400 mb-4"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  🏆 VICTORY! 🏆
-                </div>
-                <div
-                  className="text-2xl text-orange-400 mb-2"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  {winnerDisplay.winnerName}
-                </div>
-                <div
-                  className="text-lg text-yellow-300"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  WINS THE BATTLE!
-                </div>
-                <div
-                  className="text-sm text-gray-400 mt-4"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  #{winnerDisplay.winnerNFTId}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Battle Notification Message */}
-          {battleNotification && battleNotification.isVisible && (
-            <div className="mb-6 p-4 rounded-lg text-center animate-pulse bg-gradient-to-r from-red-500/20 to-orange-500/20 border-2 border-orange-400">
-              <div
-                className="text-lg text-orange-400 mb-2"
-                style={{ fontFamily: 'Press Start 2P, monospace' }}
+                { arena.rank } ARENA
+              </h2>
+              <button
+                onClick={ onClose }
+                className="text-orange-400 hover:text-orange-300 text-2xl transition-colors"
+                style={ { fontFamily: 'Press Start 2P, monospace' } }
               >
-                🎯 BATTLE MOVES! 🎯
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <div
-                  className="text-sm text-blue-400"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  {battleNotification.warriorsOneName}
-                  <br />
-                  <span className="text-yellow-400">used {battleNotification.warriorsOneMove}</span>
-                  {battleNotification.warriorsOneHitStatus && battleNotification.warriorsOneHitStatus !== 'PENDING' && (
-                    <br />
-                  )}
-                  {battleNotification.warriorsOneHitStatus === 'HIT' && (
-                    <span className="text-green-400 text-xs">✅ HIT!</span>
-                  )}
-                  {battleNotification.warriorsOneHitStatus === 'MISS' && (
-                    <span className="text-red-400 text-xs">❌ MISS</span>
-                  )}
-                  {battleNotification.warriorsOneHitStatus === 'PENDING' && (
-                    <span className="text-gray-400 text-xs animate-pulse">⏳ ...</span>
-                  )}
-                </div>
-                <div
-                  className="text-xl text-orange-400"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  VS
-                </div>
-                <div
-                  className="text-sm text-blue-400"
-                  style={{ fontFamily: 'Press Start 2P, monospace' }}
-                >
-                  {battleNotification.warriorsTwoName}
-                  <br />
-                  <span className="text-yellow-400">used {battleNotification.warriorsTwoMove}</span>
-                  {battleNotification.warriorsTwoHitStatus && battleNotification.warriorsTwoHitStatus !== 'PENDING' && (
-                    <br />
-                  )}
-                  {battleNotification.warriorsTwoHitStatus === 'HIT' && (
-                    <span className="text-green-400 text-xs">✅ HIT!</span>
-                  )}
-                  {battleNotification.warriorsTwoHitStatus === 'MISS' && (
-                    <span className="text-red-400 text-xs">❌ MISS</span>
-                  )}
-                  {battleNotification.warriorsTwoHitStatus === 'PENDING' && (
-                    <span className="text-gray-400 text-xs animate-pulse">⏳ ...</span>
-                  )}
-                </div>
-              </div>
+                ×
+              </button>
             </div>
-          )}
 
-          {/* Warriorss Display */}
-          { arena.warriorsOne && arena.warriorsTwo && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-              {/* Warriors One */}
+            {/* Battle State */}
+            <div className="text-center mb-6">
               <div
-                className="space-y-4 p-4"
-                style={ {
-                  background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                  border: '2px solid #ff8c00',
-                  backdropFilter: 'blur(15px)',
-                  WebkitBackdropFilter: 'blur(15px)',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                  borderRadius: '20px'
-                } }
+                className={ `${getStateColor(arena.state)} text-white text-sm px-4 py-2 rounded-lg inline-block` }
+                style={ { fontFamily: 'Press Start 2P, monospace' } }
               >
-                <div className="text-center">
-                  <h3
-                    className="text-orange-400 mb-2 arcade-glow"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    Warriors One
-                  </h3>
-                  <div
-                    className="w-32 h-32 mx-auto mb-2 overflow-hidden rounded aspect-square"
-                    style={ {
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)'
-                    } }
-                  >
-                    <img
-                      src={ arena.warriorsOne.image }
-                      alt={ arena.warriorsOne.name }
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <h4
-                    className="text-orange-400 font-bold arcade-glow"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    { arena.warriorsOne.name }
-                  </h4>
-                  <div
-                    className={ `${getRankColor(arena.warriorsOne.rank)} inline-block px-2 py-1 rounded mt-2` }
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    { arena.warriorsOne.rank }
-                  </div>
-                </div>
-
-                {/* Traits */}
-                <div className="space-y-2">
-                  <div
-                    className="text-sm text-orange-400 mb-2"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    TRAITS
-                  </div>
-                  <TraitBar label="Strength" value={ arena.warriorsOne.strength } />
-                  <TraitBar label="Defense" value={ arena.warriorsOne.defense } />
-                  <TraitBar label="Charisma" value={ arena.warriorsOne.charisma } />
-                  <TraitBar label="Wit" value={ arena.warriorsOne.wit } />
-                  <TraitBar label="Luck" value={ arena.warriorsOne.luck } />
-                </div>
-
-                {/* Action Buttons */}
-                { arena.state === 'BATTLE_ONGOING' && (
-                  <div className="space-y-2">
-                    <button
-                      onClick={ () => onInfluence('ONE') }
-                      className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-xs"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      <TrendingUp className="w-4 h-4 mr-2 inline" />
-                      INFLUENCE ({ arena.costToInfluenceWarriorsOne } CRwN)
-                    </button>
-                    <button
-                      onClick={ () => onDefluence('ONE') }
-                      className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-xs"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      <TrendingDown className="w-4 h-4 mr-2 inline" />
-                      DEFLUENCE ({ arena.costToDefluenceWarriorsOne } CRwN)
-                    </button>
-                  </div>
-                ) }
+                { arena.state.replace('_', ' ') }
               </div>
-
-              {/* Battle Center */}
-              <div className="space-y-6">
-                {/* VS */}
-                <div className="text-center">
-                  <div className="text-4xl text-red-500 mb-4">⚔️</div>
+              { arena.state === 'BATTLE_ONGOING' && (
+                <div className="mt-2">
                   <div
-                    className="text-xl text-orange-400 arcade-glow"
+                    className="text-orange-400"
                     style={ { fontFamily: 'Press Start 2P, monospace' } }
                   >
-                    VS
+                    Round { arena.currentRound }/{ arena.maxRounds }
                   </div>
-                </div>
-
-                {/* Last Moves Display */}
-                { arena.lastMoves && arena.state === 'BATTLE_ONGOING' && (
                   <div
-                    className="p-4 text-center"
-                    style={ {
-                      background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(15px)',
-                      WebkitBackdropFilter: 'blur(15px)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                      borderRadius: '20px'
-                    } }
-                  >
-                    <div
-                      className="text-sm text-orange-400 mb-2"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      Last Round
-                    </div>
-                    <div className="flex justify-center items-center gap-4 mb-2">
-                      <div className="text-center">
-                        { getMoveIcon(arena.lastMoves.warriorsOne) }
-                        <div
-                          className="text-xs text-orange-400 mt-1"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          { arena.lastMoves.warriorsOne }
-                        </div>
-                      </div>
-                      <span
-                        className="text-orange-400"
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        vs
-                      </span>
-                      <div className="text-center">
-                        { getMoveIcon(arena.lastMoves.warriorsTwo) }
-                        <div
-                          className="text-xs text-orange-400 mt-1"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          { arena.lastMoves.warriorsTwo }
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span
-                          className="text-red-400"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          DMG: { (arena.lastMoves.warriorsTwoDamage / 100).toFixed(2) }
-                        </span>
-                        <br />
-                        <span
-                          className="text-green-400"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          REC: { arena.lastMoves.warriorsOneRecovery }
-                        </span>
-                      </div>
-                      <div>
-                        <span
-                          className="text-red-400"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          DMG: { (arena.lastMoves.warriorsOneDamage / 100).toFixed(2) }
-                        </span>
-                        <br />
-                        <span
-                          className="text-green-400"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          REC: { arena.lastMoves.warriorsTwoRecovery }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) }
-
-                {/* Total Damages */}
-                { arena.state === 'BATTLE_ONGOING' && (
-                  <div
-                    className="p-4 text-center"
-                    style={ {
-                      background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(15px)',
-                      WebkitBackdropFilter: 'blur(15px)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                      borderRadius: '20px'
-                    } }
-                  >
-                    <div
-                      className="text-sm text-orange-400 mb-2"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      Total Damage
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div
-                          className="text-red-400 text-lg font-bold"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          { (arena.warriorsOneDamage / 100).toFixed(2) }
-                        </div>
-                        <div
-                          className="text-xs text-orange-400"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          Warriors One
-                        </div>
-                      </div>
-                      <div>
-                        <div
-                          className="text-red-400 text-lg font-bold"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          { (arena.warriorsTwoDamage / 100).toFixed(2) }
-                        </div>
-                        <div
-                          className="text-xs text-orange-400"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          Warriors Two
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) }
-
-                {/* Next Round Button - Only show when battle is ongoing */}
-                { arena.state === 'BATTLE_ONGOING' && (
-                  <div
-                    className="p-4 text-center"
-                    style={ {
-                      background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(15px)',
-                      WebkitBackdropFilter: 'blur(15px)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                      borderRadius: '20px'
-                    } }
-                  >
-                    <button
-                      onClick={ onNextRound }
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded text-sm transition-colors"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      <Trophy className="w-4 h-4 mr-2 inline" />
-                      NEXT ROUND
-                    </button>
-                    <div
-                        className="text-xs text-red-300 mt-2 max-w-xs mx-auto leading-relaxed"
-                        style={{ fontFamily: 'Press Start 2P, monospace' }}
-                      >
-                        This button is only to be used if the automation mechanism fails (timer gets to 0 and hangs there, or the timer is not visible). This is a manual override button and must not be used unless the above condition occurs, as this can break automation for this battle.
-                      </div>
-                  </div>
-                ) }
-
-                {/* Winner Announcement */}
-                { arena.winner && (
-                  <div className="arcade-card p-6 text-center">
-                    <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-                    <div className="text-xl text-yellow-400 mb-2">WINNER!</div>
-                    <div className="text-lg text-white">
-                      { arena.winner === 'ONE' ? arena.warriorsOne.name : arena.warriorsTwo.name }
-                    </div>
-                    <Button className="mt-4 arcade-button">
-                      Initialize New Battle
-                    </Button>
-                  </div>
-                ) }
-              </div>
-
-              {/* Warriors Two */}
-              <div
-                className="space-y-4 p-4"
-                style={ {
-                  background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                  border: '2px solid #ff8c00',
-                  backdropFilter: 'blur(15px)',
-                  WebkitBackdropFilter: 'blur(15px)',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                  borderRadius: '20px'
-                } }
-              >
-                <div className="text-center">
-                  <h3
-                    className="text-orange-400 mb-2 arcade-glow"
+                    className="text-xs text-yellow-300 mt-2 max-w-md mx-auto leading-relaxed"
                     style={ { fontFamily: 'Press Start 2P, monospace' } }
                   >
-                    Warriors Two
-                  </h3>
+                    Note: Players should only place bets after the round counter updates. 0G AI's response, blockchain validation, and their synchronization with the timer above can sometimes vary.
+                  </div>
                   <div
-                    className="w-32 h-32 mx-auto mb-2 overflow-hidden rounded aspect-square"
-                    style={ {
-                      border: '2px solid #ff8c00',
-                      backdropFilter: 'blur(10px)',
-                      WebkitBackdropFilter: 'blur(10px)'
-                    } }
-                  >
-                    <img
-                      src={ arena.warriorsTwo.image }
-                      alt={ arena.warriorsTwo.name }
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <h4
-                    className="text-orange-400 font-bold arcade-glow"
+                    className="text-sm text-blue-400 mt-1"
                     style={ { fontFamily: 'Press Start 2P, monospace' } }
                   >
-                    { arena.warriorsTwo.name }
-                  </h4>
-                  <div
-                    className={ `${getRankColor(arena.warriorsTwo.rank)} inline-block px-2 py-1 rounded mt-2` }
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    { arena.warriorsTwo.rank }
-                  </div>
-                </div>
-
-                {/* Traits */}
-                <div className="space-y-2">
-                  <div
-                    className="text-sm text-orange-400 mb-2"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    TRAITS
-                  </div>
-                  <TraitBar label="Strength" value={ arena.warriorsTwo.strength } />
-                  <TraitBar label="Defense" value={ arena.warriorsTwo.defense } />
-                  <TraitBar label="Charisma" value={ arena.warriorsTwo.charisma } />
-                  <TraitBar label="Wit" value={ arena.warriorsTwo.wit } />
-                  <TraitBar label="Luck" value={ arena.warriorsTwo.luck } />
-                </div>
-
-                {/* Action Buttons */}
-                { arena.state === 'BATTLE_ONGOING' && (
-                  <div className="space-y-2">
-                    <button
-                      onClick={ () => onInfluence('TWO') }
-                      className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-xs"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      <TrendingUp className="w-4 h-4 mr-2 inline" />
-                      INFLUENCE ({ arena.costToInfluenceWarriorsTwo } CRwN)
-                    </button>
-                    <button
-                      onClick={ () => onDefluence('TWO') }
-                      className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-xs"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      <TrendingDown className="w-4 h-4 mr-2 inline" />
-                      DEFLUENCE ({ arena.costToDefluenceWarriorsTwo } CRwN)
-                    </button>
-                  </div>
-                ) }
-              </div>
-            </div>
-          ) }
-
-          {/* Betting or Start Battle Section */}
-          { arena.state === 'INITIALIZED' && (
-            <div
-              className="p-6 mb-6"
-              style={ {
-                background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
-                border: '2px solid #ff8c00',
-                backdropFilter: 'blur(15px)',
-                WebkitBackdropFilter: 'blur(15px)',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
-                borderRadius: '20px'
-              } }
-            >
-              { arena.isBettingPeriod ? (
-                // Show betting interface if battle hasn't started
-                <>
-                  <h3
-                    className="text-orange-400 text-lg mb-4 text-center arcade-glow"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    Place Your Bets
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Warriors One Betting */}
-                    <div className="text-center">
-                      <div
-                        className="text-lg text-orange-400 mb-2 arcade-glow"
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        { arena.warriorsOne?.name }
-                      </div>
-                      {/* Only show betting totals if game has started (currentRound > 0) */}
-                      { arena.currentRound > 0 && (
-                        <div
-                          className="text-sm text-orange-400 mb-4"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          Total Bets: { totalWarriorsOneBets } CRwN
-                        </div>
-                      ) }
-                      <button
-                        onClick={ () => setSelectedWarriors('ONE') }
-                        className={ `w-full px-4 py-2 rounded transition-all ${selectedWarriors === 'ONE' ? 'bg-yellow-600' : 'arcade-button'} ${arena.currentRound === 0 ? 'mt-4' : ''}` }
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        Bet on Warriors One
-                      </button>
-                    </div>
-
-                    {/* Warriors Two Betting */}
-                    <div className="text-center">
-                      <div
-                        className="text-lg text-orange-400 mb-2 arcade-glow"
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        { arena.warriorsTwo?.name }
-                      </div>
-                      {/* Only show betting totals if game has started (currentRound > 0) */}
-                      { arena.currentRound > 0 && (
-                        <div
-                          className="text-sm text-orange-400 mb-4"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          Total Bets: { totalWarriorsTwoBets } CRwN
-                        </div>
-                      ) }
-                      <button
-                        onClick={ () => setSelectedWarriors('TWO') }
-                        className={ `w-full px-4 py-2 rounded transition-all ${selectedWarriors === 'TWO' ? 'bg-yellow-600' : 'arcade-button'} ${arena.currentRound === 0 ? 'mt-4' : ''}` }
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        Bet on Warriors Two
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Bet Amount Input */}
-                  { selectedWarriors && (
-                    <div className="mt-6 max-w-md mx-auto">
-                      <label
-                        className="block text-orange-400 text-sm mb-2"
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        Bet Amount (Multiples of { arena.betAmount } CRwN)
-                      </label>
-                      <div
-                        className="text-xs text-orange-300 mb-3"
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        Valid amounts: { arena.betAmount }, { arena.betAmount * 2 }, { arena.betAmount * 3 }, { arena.betAmount * 4 }...
-                      </div>
-
-                      {/* Quick bet buttons */}
-                      <div className="flex gap-2 mb-3 flex-wrap">
-                        { [1, 2, 3, 5, 10].map(multiplier => (
-                          <button
-                            key={ multiplier }
-                            onClick={ () => setBetAmount((arena.betAmount * multiplier).toString()) }
-                            className="text-xs px-3 py-1 rounded transition-colors bg-orange-600 hover:bg-orange-700 text-white"
-                            style={ { fontFamily: 'Press Start 2P, monospace' } }
-                          >
-                            { multiplier }x ({ arena.betAmount * multiplier })
-                          </button>
-                        )) }
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step={ arena.betAmount }
-                          value={ betAmount }
-                          onChange={ (e) => setBetAmount(e.target.value) }
-                          className="flex-1 p-3 rounded text-white"
-                          style={ {
-                            background: 'rgba(120, 160, 200, 0.1)',
-                            border: '2px solid #ff8c00',
-                            backdropFilter: 'blur(10px)',
-                            WebkitBackdropFilter: 'blur(10px)',
-                            fontFamily: 'Press Start 2P, monospace'
-                          } }
-                          placeholder={ arena.betAmount.toString() }
-                          min={ arena.betAmount }
-                        />
-                        <button
-                          onClick={ () => onBet(selectedWarriors) }
-                          className="arcade-button px-4 py-3"
-                          disabled={ !betAmount || parseFloat(betAmount) < arena.betAmount || parseFloat(betAmount) % arena.betAmount !== 0 }
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          Place Bet
-                        </button>
-                      </div>
-                      { betAmount && parseFloat(betAmount) % arena.betAmount !== 0 && (
-                        <div
-                          className="text-red-400 text-xs mt-2"
-                          style={ { fontFamily: 'Press Start 2P, monospace' } }
-                        >
-                          ⚠️ Amount must be a multiple of { arena.betAmount } CRwN
-                        </div>
-                      ) }
-                    </div>
-                  ) }
-
-                  {/* Total Pot - Only show if game has started */}
-                  { arena.currentRound > 0 && (
-                    <div className="text-center mt-6">
-                      <div
-                        className="text-lg text-orange-400 arcade-glow"
-                        style={ { fontFamily: 'Press Start 2P, monospace' } }
-                      >
-                        Total Pot: { totalPot } CRwN
-                      </div>
-                    </div>
-                  ) }
-                </>
-              ) : (
-                // Show Start Battle button if battle is ready to start
-                <div className="text-center">
-                  <h3
-                    className="text-orange-400 text-lg mb-6 arcade-glow"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    Battle Ready to Begin!
-                  </h3>
-
-                  <div className="mb-6">
-                    <div
-                      className="text-sm text-orange-400 mb-2"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      Total Prize Pool: { totalPot } CRwN
-                    </div>
-                    <div
-                      className="text-xs text-orange-300"
-                      style={ { fontFamily: 'Press Start 2P, monospace' } }
-                    >
-                      Click below to commence the battle between the Warriorss
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={ onStartGame }
-                    className="arcade-button text-lg px-8 py-4 bg-red-600 hover:bg-red-700 transition-colors"
-                    style={ {
-                      fontFamily: 'Press Start 2P, monospace',
-                      borderRadius: '12px',
-                      boxShadow: '0 4px 8px rgba(220, 38, 38, 0.3)'
-                    } }
-                  >
-                    ⚔️ START BATTLE ⚔️
-                  </button>
-                  
-                  <div
-                    className="text-xs text-red-300 mt-4 max-w-lg mx-auto leading-relaxed"
-                    style={ { fontFamily: 'Press Start 2P, monospace' } }
-                  >
-                    This button is only to be used if the automation mechanism fails (timer gets to 0 and hangs there, or the timer is not visible). This is a manual override button and must not be used unless the above condition occurs, as this can break automation for this battle.
+                    Phase: { arena.battlePhase.replace('_', ' ') }
                   </div>
                 </div>
               ) }
             </div>
-          ) }
 
-          {/* Betting History */}
-          { (arena.playerOneBets.length > 0 || arena.playerTwoBets.length > 0) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Warriors One Bets */}
-              <div className="arcade-card p-4">
-                <h4 className="text-yellow-400 mb-3">Warriors One Supporters</h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  { arena.playerOneBets.map((bet, index) => (
-                    <div key={ index } className="flex justify-between text-sm">
-                      <span className="text-gray-400">
-                        { bet.address.slice(0, 6) }...{ bet.address.slice(-4) }
-                      </span>
-                      <span className="text-white">{ bet.amount } CRwN</span>
+            {/* Automation Status - Show when automation is active */}
+            {arenaSync?.gameState && (
+              <div className="mb-6">
+                <GameTimer
+                  gameState={arenaSync.gameState.gameState || 'idle'}
+                  timeRemaining={arenaSync.gameState.timeRemaining || 0}
+                  totalTime={arenaSync.gameState.totalTime || 0}
+                />
+                
+                {/* Manual Override Buttons */}
+                {(arenaSync.gameState.gameState === 'betting' || arenaSync.gameState.gameState === 'playing') && (
+                  <div className="mt-4 flex gap-4 justify-center">
+                    {arenaSync.gameState.gameState === 'betting' && manualStartGame && (
+                      <div className="text-center">
+                        <button
+                          onClick={manualStartGame}
+                          className="arcade-button px-4 py-2 text-sm"
+                          style={{ fontFamily: 'Press Start 2P, monospace' }}
+                        >
+                          START NOW
+                        </button>
+                        <div
+                          className="text-xs text-red-300 mt-2 max-w-xs mx-auto leading-relaxed"
+                          style={{ fontFamily: 'Press Start 2P, monospace' }}
+                        >
+                          This button is only to be used if the automation mechanism fails (timer gets to 0 and hangs there, or the timer is not visible). This is a manual override button and must not be used unless the above condition occurs, as this can break automation for this battle.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Automation Status */}
+                <div className="mt-2 text-center">
+                  <div
+                    className="text-xs text-green-400"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    🤖 AUTOMATION ACTIVE
+                  </div>
+                  {arenaSync.error && (
+                    <div
+                      className="text-xs text-red-400 mt-1"
+                      style={{ fontFamily: 'Press Start 2P, monospace' }}
+                    >
+                      ⚠️ {arenaSync.error}
                     </div>
-                  )) }
+                  )}
                 </div>
               </div>
+            )}
 
-              {/* Warriors Two Bets */}
-              <div className="arcade-card p-4">
-                <h4 className="text-yellow-400 mb-3">Warriors Two Supporters</h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  { arena.playerTwoBets.map((bet, index) => (
-                    <div key={ index } className="flex justify-between text-sm">
-                      <span className="text-gray-400">
-                        { bet.address.slice(0, 6) }...{ bet.address.slice(-4) }
-                      </span>
-                      <span className="text-white">{ bet.amount } CRwN</span>
+            {/* Arena Initialization Form - Only for EMPTY arenas and when not showing winner */}
+            { arena.state === 'EMPTY' && (!winnerDisplay || !winnerDisplay.isVisible) && (
+              <div
+                className="p-6 mb-6"
+                style={ {
+                  background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                  border: '2px solid #ff8c00',
+                  backdropFilter: 'blur(15px)',
+                  WebkitBackdropFilter: 'blur(15px)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                  borderRadius: '20px'
+                } }
+              >
+                <h3
+                  className="text-orange-400 text-lg mb-6 text-center arcade-glow"
+                  style={ { fontFamily: 'Press Start 2P, monospace' } }
+                >
+                  Initialize Arena
+                </h3>
+                
+                <div className="grid gap-4">
+                  <div>
+                    <label
+                      className="block text-orange-400 text-sm mb-3"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Warriors One NFT ID
+                    </label>
+                    <input
+                      type="number"
+                      value={ warriorsOneNFTId }
+                      onChange={ (e) => setWarriorsOneNFTId(e.target.value) }
+                      className="w-full p-3 rounded text-white"
+                      style={ {
+                        background: 'rgba(120, 160, 200, 0.1)',
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        fontFamily: 'Press Start 2P, monospace'
+                      } }
+                      placeholder="Enter NFT ID for Warriors One"
+                      min="1"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="block text-orange-400 text-sm mb-3"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Warriors Two NFT ID
+                    </label>
+                    <input
+                      type="number"
+                      value={ warriorsTwoNFTId }
+                      onChange={ (e) => setWarriorsTwoNFTId(e.target.value) }
+                      className="w-full p-3 rounded text-white"
+                      style={ {
+                        background: 'rgba(120, 160, 200, 0.1)',
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        fontFamily: 'Press Start 2P, monospace'
+                      } }
+                      placeholder="Enter NFT ID for Warriors Two"
+                      min="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-center space-y-4">
+                  <div
+                    className="text-sm text-orange-400"
+                    style={ { fontFamily: 'Press Start 2P, monospace' } }
+                  >
+                    Arena Details: <span className="text-orange-400">{ arena.rank }</span> •
+                    Bet Amount: <span className="text-orange-400">{ arena.betAmount } CRwN</span>
+                  </div>
+
+                  { initializationError && (
+                    <div
+                      className="text-red-400 text-xs p-3 rounded"
+                      style={ {
+                        fontFamily: 'Press Start 2P, monospace',
+                        background: 'rgba(255, 0, 0, 0.1)',
+                        border: '1px solid rgba(255, 0, 0, 0.3)',
+                        whiteSpace: 'pre-line',
+                        lineHeight: '1.6'
+                      } }
+                    >
+                      ⚠️ { initializationError }
                     </div>
-                  )) }
+                  ) }
+
+                  <button
+                    onClick={ onInitialize }
+                    className={ `arcade-button px-8 py-3 ${isInitializing ? 'opacity-50 cursor-not-allowed' : ''}` }
+                    disabled={ !warriorsOneNFTId || !warriorsTwoNFTId || isInitializing }
+                    style={ {
+                      fontFamily: 'Press Start 2P, monospace',
+                      borderRadius: '12px'
+                    } }
+                  >
+                    { isInitializing ? 'INITIALIZING...' : 'INITIALIZE ARENA' }
+                  </button>
+
+                  { isInitializing && (
+                    <div
+                      className="text-orange-400 text-xs"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      ⚡ Transaction in progress... Please wait.
+                    </div>
+                  ) }
+
+                  { (!warriorsOneNFTId || !warriorsTwoNFTId) && !isInitializing && (
+                    <div
+                      className="text-red-400 text-xs"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Please enter both Warriors NFT IDs to initialize the arena
+                    </div>
+                  ) }
                 </div>
               </div>
-            </div>
-          ) }
+            ) }
+
+            {/* Winner Display - Shows for 10 seconds after battle ends */}
+            {winnerDisplay && winnerDisplay.isVisible && (
+              <div className="mb-6 p-8 rounded-lg text-center bg-gradient-to-r from-yellow-500/30 to-orange-500/30 border-4 border-yellow-400 shadow-2xl">
+                <div className="animate-bounce">
+                  <div
+                    className="text-3xl text-yellow-400 mb-4"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    🏆 VICTORY! 🏆
+                  </div>
+                  <div
+                    className="text-2xl text-orange-400 mb-2"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    {winnerDisplay.winnerName}
+                  </div>
+                  <div
+                    className="text-lg text-yellow-300"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    WINS THE BATTLE!
+                  </div>
+                  <div
+                    className="text-sm text-gray-400 mt-4"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    #{winnerDisplay.winnerNFTId}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Battle Notification Message */}
+            {battleNotification && battleNotification.isVisible && (
+              <div className="mb-6 p-4 rounded-lg text-center animate-pulse bg-gradient-to-r from-red-500/20 to-orange-500/20 border-2 border-orange-400">
+                <div
+                  className="text-lg text-orange-400 mb-2"
+                  style={{ fontFamily: 'Press Start 2P, monospace' }}
+                >
+                  🎯 BATTLE MOVES! 🎯
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                  <div
+                    className="text-sm text-blue-400"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    {battleNotification.warriorsOneName}
+                    <br />
+                    <span className="text-yellow-400">used {battleNotification.warriorsOneMove}</span>
+                    {battleNotification.warriorsOneHitStatus && battleNotification.warriorsOneHitStatus !== 'PENDING' && (
+                      <br />
+                    )}
+                    {battleNotification.warriorsOneHitStatus === 'HIT' && (
+                      <span className="text-green-400 text-xs">✅ HIT!</span>
+                    )}
+                    {battleNotification.warriorsOneHitStatus === 'MISS' && (
+                      <span className="text-red-400 text-xs">❌ MISS</span>
+                    )}
+                    {battleNotification.warriorsOneHitStatus === 'PENDING' && (
+                      <span className="text-gray-400 text-xs animate-pulse">⏳ ...</span>
+                    )}
+                  </div>
+                  <div
+                    className="text-xl text-orange-400"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    VS
+                  </div>
+                  <div
+                    className="text-sm text-blue-400"
+                    style={{ fontFamily: 'Press Start 2P, monospace' }}
+                  >
+                    {battleNotification.warriorsTwoName}
+                    <br />
+                    <span className="text-yellow-400">used {battleNotification.warriorsTwoMove}</span>
+                    {battleNotification.warriorsTwoHitStatus && battleNotification.warriorsTwoHitStatus !== 'PENDING' && (
+                      <br />
+                    )}
+                    {battleNotification.warriorsTwoHitStatus === 'HIT' && (
+                      <span className="text-green-400 text-xs">✅ HIT!</span>
+                    )}
+                    {battleNotification.warriorsTwoHitStatus === 'MISS' && (
+                      <span className="text-red-400 text-xs">❌ MISS</span>
+                    )}
+                    {battleNotification.warriorsTwoHitStatus === 'PENDING' && (
+                      <span className="text-gray-400 text-xs animate-pulse">⏳ ...</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Warriorss Display */}
+            { arena.warriorsOne && arena.warriorsTwo && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Warriors One */}
+                <div
+                  className="space-y-4 p-4"
+                  style={ {
+                    background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                    border: '2px solid #ff8c00',
+                    backdropFilter: 'blur(15px)',
+                    WebkitBackdropFilter: 'blur(15px)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                    borderRadius: '20px'
+                  } }
+                >
+                  <div className="text-center">
+                    <h3
+                      className="text-orange-400 mb-2 arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Warriors One
+                    </h3>
+                    <div
+                      className="w-32 h-32 mx-auto mb-2 rounded aspect-square relative group"
+                      style={ {
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)'
+                      } }
+                    >
+                      <img
+                        src={ arena.warriorsOne.image }
+                        alt={ arena.warriorsOne.name }
+                        className="w-full h-full object-cover rounded"
+                      />
+                      {/* Info Icon */}
+                      <div 
+                        className="absolute top-1 right-1 w-6 h-6 bg-orange-400 bg-opacity-80 rounded-full flex items-center justify-center text-black text-xs font-bold cursor-help hover:bg-opacity-100 transition-all duration-200"
+                        onMouseEnter={(e) => showTooltip('ONE', e)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <span style={{ fontFamily: 'Press Start 2P, monospace' }}>i</span>
+                      </div>
+                    </div>
+                    <h4
+                      className="text-orange-400 font-bold arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      { arena.warriorsOne.name }
+                    </h4>
+                    <div
+                      className={ `${getRankColor(arena.warriorsOne.rank)} inline-block px-2 py-1 rounded mt-2` }
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      { arena.warriorsOne.rank }
+                    </div>
+                  </div>
+
+                  {/* Traits */}
+                  <div className="space-y-2">
+                    <div
+                      className="text-sm text-orange-400 mb-2"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      TRAITS
+                    </div>
+                    <TraitBar label="Strength" value={ arena.warriorsOne.strength } />
+                    <TraitBar label="Defense" value={ arena.warriorsOne.defense } />
+                    <TraitBar label="Charisma" value={ arena.warriorsOne.charisma } />
+                    <TraitBar label="Wit" value={ arena.warriorsOne.wit } />
+                    <TraitBar label="Luck" value={ arena.warriorsOne.luck } />
+                  </div>
+
+                  {/* Action Buttons */}
+                  { arena.state === 'BATTLE_ONGOING' && (
+                    <div className="space-y-2">
+                      <button
+                        onClick={ () => onInfluence('ONE') }
+                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-xs"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2 inline" />
+                        INFLUENCE ({ arena.costToInfluenceWarriorsOne } CRwN)
+                      </button>
+                      <button
+                        onClick={ () => onDefluence('ONE') }
+                        className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-xs"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        <TrendingDown className="w-4 h-4 mr-2 inline" />
+                        DEFLUENCE ({ arena.costToDefluenceWarriorsOne } CRwN)
+                      </button>
+                    </div>
+                  ) }
+                </div>
+
+                {/* Battle Center */}
+                <div className="space-y-6">
+                  {/* VS */}
+                  <div className="text-center">
+                    <div className="text-4xl text-red-500 mb-4">⚔️</div>
+                    <div
+                      className="text-xl text-orange-400 arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      VS
+                    </div>
+                  </div>
+
+                  {/* Last Moves Display */}
+                  { arena.lastMoves && arena.state === 'BATTLE_ONGOING' && (
+                    <div
+                      className="p-4 text-center"
+                      style={ {
+                        background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(15px)',
+                        WebkitBackdropFilter: 'blur(15px)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                        borderRadius: '20px'
+                      } }
+                    >
+                      <div
+                        className="text-sm text-orange-400 mb-2"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        Last Round
+                      </div>
+                      <div className="flex justify-center items-center gap-4 mb-2">
+                        <div className="text-center">
+                          { getMoveIcon(arena.lastMoves.warriorsOne) }
+                          <div
+                            className="text-xs text-orange-400 mt-1"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            { arena.lastMoves.warriorsOne }
+                          </div>
+                        </div>
+                        <span
+                          className="text-orange-400"
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          vs
+                        </span>
+                        <div className="text-center">
+                          { getMoveIcon(arena.lastMoves.warriorsTwo) }
+                          <div
+                            className="text-xs text-orange-400 mt-1"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            { arena.lastMoves.warriorsTwo }
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span
+                            className="text-red-400"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            DMG: { (arena.lastMoves.warriorsTwoDamage / 100).toFixed(2) }
+                          </span>
+                          <br />
+                          <span
+                            className="text-green-400"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            REC: { arena.lastMoves.warriorsOneRecovery }
+                          </span>
+                        </div>
+                        <div>
+                          <span
+                            className="text-red-400"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            DMG: { (arena.lastMoves.warriorsOneDamage / 100).toFixed(2) }
+                          </span>
+                          <br />
+                          <span
+                            className="text-green-400"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            REC: { arena.lastMoves.warriorsTwoRecovery }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) }
+
+                  {/* Total Damages */}
+                  { arena.state === 'BATTLE_ONGOING' && (
+                    <div
+                      className="p-4 text-center"
+                      style={ {
+                        background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(15px)',
+                        WebkitBackdropFilter: 'blur(15px)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                        borderRadius: '20px'
+                      } }
+                    >
+                      <div
+                        className="text-sm text-orange-400 mb-2"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        Total Damage
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div
+                            className="text-red-400 text-lg font-bold"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            { (arena.warriorsOneDamage / 100).toFixed(2) }
+                          </div>
+                          <div
+                            className="text-xs text-orange-400"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            Warriors One
+                          </div>
+                        </div>
+                        <div>
+                          <div
+                            className="text-red-400 text-lg font-bold"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            { (arena.warriorsTwoDamage / 100).toFixed(2) }
+                          </div>
+                          <div
+                            className="text-xs text-orange-400"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            Warriors Two
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) }
+
+                  {/* Next Round Button - Only show when battle is ongoing */}
+                  { arena.state === 'BATTLE_ONGOING' && (
+                    <div
+                      className="p-4 text-center"
+                      style={ {
+                        background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(15px)',
+                        WebkitBackdropFilter: 'blur(15px)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                        borderRadius: '20px'
+                      } }
+                    >
+                      <button
+                        onClick={ onNextRound }
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded text-sm transition-colors"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        <Trophy className="w-4 h-4 mr-2 inline" />
+                        NEXT ROUND
+                      </button>
+                      <div
+                          className="text-xs text-red-300 mt-2 max-w-xs mx-auto leading-relaxed"
+                          style={{ fontFamily: 'Press Start 2P, monospace' }}
+                        >
+                          This button is only to be used if the automation mechanism fails (timer gets to 0 and hangs there, or the timer is not visible). This is a manual override button and must not be used unless the above condition occurs, as this can break automation for this battle.
+                        </div>
+                    </div>
+                  ) }
+
+                  {/* Winner Announcement */}
+                  { arena.winner && (
+                    <div className="arcade-card p-6 text-center">
+                      <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                      <div className="text-xl text-yellow-400 mb-2">WINNER!</div>
+                      <div className="text-lg text-white">
+                        { arena.winner === 'ONE' ? arena.warriorsOne.name : arena.warriorsTwo.name }
+                      </div>
+                      <Button className="mt-4 arcade-button">
+                        Initialize New Battle
+                      </Button>
+                    </div>
+                  ) }
+                </div>
+
+                {/* Warriors Two */}
+                <div
+                  className="space-y-4 p-4"
+                  style={ {
+                    background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                    border: '2px solid #ff8c00',
+                    backdropFilter: 'blur(15px)',
+                    WebkitBackdropFilter: 'blur(15px)',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                    borderRadius: '20px'
+                  } }
+                >
+                  <div className="text-center">
+                    <h3
+                      className="text-orange-400 mb-2 arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Warriors Two
+                    </h3>
+                    <div
+                      className="w-32 h-32 mx-auto mb-2 rounded aspect-square relative group"
+                      style={ {
+                        border: '2px solid #ff8c00',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)'
+                      } }
+                    >
+                      <img
+                        src={ arena.warriorsTwo.image }
+                        alt={ arena.warriorsTwo.name }
+                        className="w-full h-full object-cover rounded"
+                      />
+                      {/* Info Icon */}
+                      <div 
+                        className="absolute top-1 right-1 w-6 h-6 bg-orange-400 bg-opacity-80 rounded-full flex items-center justify-center text-black text-xs font-bold cursor-help hover:bg-opacity-100 transition-all duration-200"
+                        onMouseEnter={(e) => showTooltip('TWO', e)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <span style={{ fontFamily: 'Press Start 2P, monospace' }}>i</span>
+                      </div>
+                    </div>
+                    <h4
+                      className="text-orange-400 font-bold arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      { arena.warriorsTwo.name }
+                    </h4>
+                    <div
+                      className={ `${getRankColor(arena.warriorsTwo.rank)} inline-block px-2 py-1 rounded mt-2` }
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      { arena.warriorsTwo.rank }
+                    </div>
+                  </div>
+
+                  {/* Traits */}
+                  <div className="space-y-2">
+                    <div
+                      className="text-sm text-orange-400 mb-2"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      TRAITS
+                    </div>
+                    <TraitBar label="Strength" value={ arena.warriorsTwo.strength } />
+                    <TraitBar label="Defense" value={ arena.warriorsTwo.defense } />
+                    <TraitBar label="Charisma" value={ arena.warriorsTwo.charisma } />
+                    <TraitBar label="Wit" value={ arena.warriorsTwo.wit } />
+                    <TraitBar label="Luck" value={ arena.warriorsTwo.luck } />
+                  </div>
+
+                  {/* Action Buttons */}
+                  { arena.state === 'BATTLE_ONGOING' && (
+                    <div className="space-y-2">
+                      <button
+                        onClick={ () => onInfluence('TWO') }
+                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-xs"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2 inline" />
+                        INFLUENCE ({ arena.costToInfluenceWarriorsTwo } CRwN)
+                      </button>
+                      <button
+                        onClick={ () => onDefluence('TWO') }
+                        className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-xs"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        <TrendingDown className="w-4 h-4 mr-2 inline" />
+                        DEFLUENCE ({ arena.costToDefluenceWarriorsTwo } CRwN)
+                      </button>
+                    </div>
+                  ) }
+                </div>
+              </div>
+            ) }
+
+            {/* Betting or Start Battle Section */}
+            { arena.state === 'INITIALIZED' && (
+              <div
+                className="p-6 mb-6"
+                style={ {
+                  background: 'radial-gradient(circle at top left, rgba(120, 160, 200, 0.15), rgba(100, 140, 180, 0.1) 50%), linear-gradient(135deg, rgba(120, 160, 200, 0.2) 0%, rgba(100, 140, 180, 0.15) 30%, rgba(120, 160, 200, 0.2) 100%)',
+                  border: '2px solid #ff8c00',
+                  backdropFilter: 'blur(15px)',
+                  WebkitBackdropFilter: 'blur(15px)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1), 0 0 8px rgba(255, 140, 0, 0.2)',
+                  borderRadius: '20px'
+                } }
+              >
+                { arena.isBettingPeriod ? (
+                  // Show betting interface if battle hasn't started
+                  <>
+                    <h3
+                      className="text-orange-400 text-lg mb-4 text-center arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Place Your Bets
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Warriors One Betting */}
+                      <div className="text-center">
+                        <div
+                          className="text-lg text-orange-400 mb-2 arcade-glow"
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          { arena.warriorsOne?.name }
+                        </div>
+                        {/* Only show betting totals if game has started (currentRound > 0) */}
+                        { arena.currentRound > 0 && (
+                          <div
+                            className="text-sm text-orange-400 mb-4"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            Total Bets: { totalWarriorsOneBets } CRwN
+                          </div>
+                        ) }
+                        <button
+                          onClick={ () => setSelectedWarriors('ONE') }
+                          className={ `w-full px-4 py-2 rounded transition-all ${selectedWarriors === 'ONE' ? 'bg-yellow-600' : 'arcade-button'} ${arena.currentRound === 0 ? 'mt-4' : ''}` }
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          Bet on Warriors One
+                        </button>
+                      </div>
+
+                      {/* Warriors Two Betting */}
+                      <div className="text-center">
+                        <div
+                          className="text-lg text-orange-400 mb-2 arcade-glow"
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          { arena.warriorsTwo?.name }
+                        </div>
+                        {/* Only show betting totals if game has started (currentRound > 0) */}
+                        { arena.currentRound > 0 && (
+                          <div
+                            className="text-sm text-orange-400 mb-4"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            Total Bets: { totalWarriorsTwoBets } CRwN
+                          </div>
+                        ) }
+                        <button
+                          onClick={ () => setSelectedWarriors('TWO') }
+                          className={ `w-full px-4 py-2 rounded transition-all ${selectedWarriors === 'TWO' ? 'bg-yellow-600' : 'arcade-button'} ${arena.currentRound === 0 ? 'mt-4' : ''}` }
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          Bet on Warriors Two
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bet Amount Input */}
+                    { selectedWarriors && (
+                      <div className="mt-6 max-w-md mx-auto">
+                        <label
+                          className="block text-orange-400 text-sm mb-2"
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          Bet Amount (Multiples of { arena.betAmount } CRwN)
+                        </label>
+                        <div
+                          className="text-xs text-orange-300 mb-3"
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          Valid amounts: { arena.betAmount }, { arena.betAmount * 2 }, { arena.betAmount * 3 }, { arena.betAmount * 4 }...
+                        </div>
+
+                        {/* Quick bet buttons */}
+                        <div className="flex gap-2 mb-3 flex-wrap">
+                          { [1, 2, 3, 5, 10].map(multiplier => (
+                            <button
+                              key={ multiplier }
+                              onClick={ () => setBetAmount((arena.betAmount * multiplier).toString()) }
+                              className="text-xs px-3 py-1 rounded transition-colors bg-orange-600 hover:bg-orange-700 text-white"
+                              style={ { fontFamily: 'Press Start 2P, monospace' } }
+                            >
+                              { multiplier }x ({ arena.betAmount * multiplier })
+                            </button>
+                          )) }
+                        </div>
+
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step={ arena.betAmount }
+                            value={ betAmount }
+                            onChange={ (e) => setBetAmount(e.target.value) }
+                            className="flex-1 p-3 rounded text-white"
+                            style={ {
+                              background: 'rgba(120, 160, 200, 0.1)',
+                              border: '2px solid #ff8c00',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
+                              fontFamily: 'Press Start 2P, monospace'
+                            } }
+                            placeholder={ arena.betAmount.toString() }
+                            min={ arena.betAmount }
+                          />
+                          <button
+                            onClick={ () => onBet(selectedWarriors) }
+                            className="arcade-button px-4 py-3"
+                            disabled={ !betAmount || parseFloat(betAmount) < arena.betAmount || parseFloat(betAmount) % arena.betAmount !== 0 }
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            Place Bet
+                          </button>
+                        </div>
+                        { betAmount && parseFloat(betAmount) % arena.betAmount !== 0 && (
+                          <div
+                            className="text-red-400 text-xs mt-2"
+                            style={ { fontFamily: 'Press Start 2P, monospace' } }
+                          >
+                            ⚠️ Amount must be a multiple of { arena.betAmount } CRwN
+                          </div>
+                        ) }
+                      </div>
+                    ) }
+
+                    {/* Total Pot - Only show if game has started */}
+                    { arena.currentRound > 0 && (
+                      <div className="text-center mt-6">
+                        <div
+                          className="text-lg text-orange-400 arcade-glow"
+                          style={ { fontFamily: 'Press Start 2P, monospace' } }
+                        >
+                          Total Pot: { totalPot } CRwN
+                        </div>
+                      </div>
+                    ) }
+                  </>
+                ) : (
+                  // Show Start Battle button if battle is ready to start
+                  <div className="text-center">
+                    <h3
+                      className="text-orange-400 text-lg mb-6 arcade-glow"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      Battle Ready to Begin!
+                    </h3>
+
+                    <div className="mb-6">
+                      <div
+                        className="text-sm text-orange-400 mb-2"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        Total Prize Pool: { totalPot } CRwN
+                      </div>
+                      <div
+                        className="text-xs text-orange-300"
+                        style={ { fontFamily: 'Press Start 2P, monospace' } }
+                      >
+                        Click below to commence the battle between the Warriorss
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={ onStartGame }
+                      className="arcade-button text-lg px-8 py-4 bg-red-600 hover:bg-red-700 transition-colors"
+                      style={ {
+                        fontFamily: 'Press Start 2P, monospace',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 8px rgba(220, 38, 38, 0.3)'
+                      } }
+                    >
+                      ⚔️ START BATTLE ⚔️
+                    </button>
+                    
+                    <div
+                      className="text-xs text-red-300 mt-4 max-w-lg mx-auto leading-relaxed"
+                      style={ { fontFamily: 'Press Start 2P, monospace' } }
+                    >
+                      This button is only to be used if the automation mechanism fails (timer gets to 0 and hangs there, or the timer is not visible). This is a manual override button and must not be used unless the above condition occurs, as this can break automation for this battle.
+                    </div>
+                  </div>
+                ) }
+              </div>
+            ) }
+
+            {/* Betting History */}
+            { (arena.playerOneBets.length > 0 || arena.playerTwoBets.length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Warriors One Bets */}
+                <div className="arcade-card p-4">
+                  <h4 className="text-yellow-400 mb-3">Warriors One Supporters</h4>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    { arena.playerOneBets.map((bet, index) => (
+                      <div key={ index } className="flex justify-between text-sm">
+                        <span className="text-gray-400">
+                          { bet.address.slice(0, 6) }...{ bet.address.slice(-4) }
+                        </span>
+                        <span className="text-white">{ bet.amount } CRwN</span>
+                      </div>
+                    )) }
+                  </div>
+                </div>
+
+                {/* Warriors Two Bets */}
+                <div className="arcade-card p-4">
+                  <h4 className="text-yellow-400 mb-3">Warriors Two Supporters</h4>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    { arena.playerTwoBets.map((bet, index) => (
+                      <div key={ index } className="flex justify-between text-sm">
+                        <span className="text-gray-400">
+                          { bet.address.slice(0, 6) }...{ bet.address.slice(-4) }
+                        </span>
+                        <span className="text-white">{ bet.amount } CRwN</span>
+                      </div>
+                    )) }
+                  </div>
+                </div>
+              </div>
+            ) }
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

@@ -1,26 +1,37 @@
+// DEPRECATED: This API route has been moved to the dedicated arena backend service
+// New endpoint: http://localhost:3002/api/arena/status
+// This file now serves as a redirect to the new backend
 import { NextApiRequest, NextApiResponse } from 'next';
-import { gameStates } from './commands';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { battleId } = req.query;
+  
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { battleId } = req.query;
-  if (!battleId || typeof battleId !== 'string') {
-    return res.status(400).json({ error: 'Battle ID is required' });
-  }
-
   try {
-    const gameState = gameStates.get(battleId);
+    // Redirect to the new backend service
+    const backendUrl = `http://localhost:3002/api/arena/status${battleId ? `?battleId=${battleId}` : ''}`;
     
-    // Return 200 with null gameState instead of 404 to prevent useArenaSync errors
-    // This endpoint is for reading state only, not consuming commands
-    return res.status(200).json({
-      gameState: gameState || null
+    // Forward the request to the new backend
+    const response = await fetch(backendUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
+    
+    const data = await response.json();
+    
+    // Return the response from the backend
+    res.status(response.status).json(data);
+    
   } catch (error) {
-    console.error('Status API error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error redirecting to backend:', error);
+    res.status(500).json({ 
+      error: 'Backend service unavailable. Please ensure the arena backend is running on port 3002.',
+      originalError: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

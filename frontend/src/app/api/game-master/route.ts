@@ -4,7 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { flowPreviewnet } from 'viem/chains';
 
 // Import the contract ABI
-import { KurukshetraAbi } from '../../../constants';
+import { ArenaAbi } from '../../../constants';
 
 // Game Master's private key from environment
 const GAME_MASTER_PRIVATE_KEY = process.env.NEXT_PUBLIC_GAME_MASTER_PRIVATE_KEY as `0x${string}`;
@@ -57,47 +57,47 @@ async function getArenaState(arenaAddress: string): Promise<ArenaState | null> {
     ] = await Promise.all([
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getInitializationStatus',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getCurrentRound',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getIsBettingPeriodGoingOn',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getGameInitializedAt',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getLastRoundEndedAt',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getMinYodhaBettingPeriod',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getMinBattleRoundsInterval',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getPlayerOneBetAddresses',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getPlayerTwoBetAddresses',
       })
     ]);
@@ -126,7 +126,7 @@ async function startGame(arenaAddress: string): Promise<boolean> {
     
     const hash = await walletClient.writeContract({
       address: arenaAddress as `0x${string}`,
-      abi: KurukshetraAbi,
+      abi: ArenaAbi,
       functionName: 'startGame',
     });
 
@@ -149,30 +149,30 @@ async function startGame(arenaAddress: string): Promise<boolean> {
 async function generateAIMoves(arenaAddress: string): Promise<{ agent_1: { move: string }, agent_2: { move: string } } | null> {
   try {
     // Get current battle data from contract
-    const [currentRound, damageOnYodhaOne, damageOnYodhaTwo, yodhaOneNFTId, yodhaTwoNFTId] = await Promise.all([
+    const [currentRound, damageOnYodhaOne, damageOnYodhaTwo, warriorsOneNFTId, warriorsTwoNFTId] = await Promise.all([
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getCurrentRound',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getDamageOnYodhaOne',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getDamageOnYodhaTwo',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getYodhaOneNFTId',
       }),
       publicClient.readContract({
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getYodhaTwoNFTId',
       })
     ]);
@@ -217,54 +217,31 @@ async function generateAIMoves(arenaAddress: string): Promise<{ agent_1: { move:
       ]
     };
 
-    // Use the pre-made auth token from environment variable
-    const authKey = process.env.NEXT_PUBLIC_AUTH_KEY;
-    if (!authKey) {
-      console.error('Game Master: NEXT_PUBLIC_AUTH_KEY not found in environment variables');
-      return null;
-    }
-
-    const authData = JSON.parse(authKey);
-    const authForApi = {
-      signature: authData.signature,
-      account_id: authData.account_id,
-      public_key: authData.public_key,
-      message: authData.message,
-      nonce: authData.nonce,
-      recipient: authData.recipient,
-      callback_url: authData.callback_url
-    };
-
-    // Get the move selector assistant ID from constants
-    const near_agent_move_selecter = "01JH5G6YCEEHDC53F8HQVF6S97";
-
-    // Call NEAR AI for move selection
-    console.log('Game Master: Calling NEAR AI for move selection...');
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/near-ai-moves`, {
+    // Call 0G AI for move selection
+    console.log('Game Master: Calling 0G AI for move selection...');
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/generate-battle-moves`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        auth: authForApi,
-        prompt: JSON.stringify(battlePrompt),
-        assistantId: near_agent_move_selecter
+        battlePrompt: battlePrompt
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Game Master: AI API Error:', errorText);
+      console.error('Game Master: 0G AI API Error:', errorText);
       return null;
     }
 
     const data = await response.json();
     if (!data.success) {
-      console.error('Game Master: AI API Error:', data.error);
+      console.error('Game Master: 0G AI API Error:', data.error);
       return null;
     }
 
-    console.log('Game Master: NEAR AI Response:', data.response);
+    console.log('Game Master: 0G AI Response:', data.response);
 
     // Parse the AI response to extract moves
     try {
@@ -336,18 +313,18 @@ async function executeNextRound(arenaAddress: string): Promise<boolean> {
       'recover': 4
     };
 
-    const yodhaOneMove = moveMapping[moves.agent_1.move.toLowerCase()] ?? 0;
-    const yodhaTwoMove = moveMapping[moves.agent_2.move.toLowerCase()] ?? 0;
+    const warriorsOneMove = moveMapping[moves.agent_1.move.toLowerCase()] ?? 0;
+    const warriorsTwoMove = moveMapping[moves.agent_2.move.toLowerCase()] ?? 0;
 
-    // Create signature for the battle moves (this would normally be done by NEAR AI agent)
+    // Create signature for the battle moves (this would normally be done by 0G AI agent)
     // For automation, we'll use the game master's signature
-    // The contract expects: keccak256(abi.encodePacked(_yodhaOneMove, _yodhaTwoMove))
+    // The contract expects: keccak256(abi.encodePacked(_warriorsOneMove, _warriorsTwoMove))
     // followed by MessageHashUtils.toEthSignedMessageHash()
     
     const { encodePacked, keccak256, toHex } = await import('viem');
     
     // Encode the moves as the contract expects: abi.encodePacked(uint8, uint8)
-    const encodedMoves = encodePacked(['uint8', 'uint8'], [yodhaOneMove, yodhaTwoMove]);
+    const encodedMoves = encodePacked(['uint8', 'uint8'], [warriorsOneMove, warriorsTwoMove]);
     
     // Create the keccak256 hash
     const dataHash = keccak256(encodedMoves);
@@ -362,13 +339,13 @@ async function executeNextRound(arenaAddress: string): Promise<boolean> {
       message: { raw: ethSignedMessageHash }
     });
 
-    console.log(`Game Master: Executing battle with moves ${yodhaOneMove} vs ${yodhaTwoMove}`);
+    console.log(`Game Master: Executing battle with moves ${warriorsOneMove} vs ${warriorsTwoMove}`);
     
     const hash = await walletClient.writeContract({
       address: arenaAddress as `0x${string}`,
-      abi: KurukshetraAbi,
+      abi: ArenaAbi,
       functionName: 'battle',
-      args: [yodhaOneMove, yodhaTwoMove, signature as `0x${string}`]
+      args: [warriorsOneMove, warriorsTwoMove, signature as `0x${string}`]
     });
 
     console.log(`Game Master: Battle transaction sent: ${hash}`);
@@ -432,8 +409,8 @@ export async function POST(request: NextRequest) {
             reason: !arenaState.isInitialized ? 'not_initialized' :
                    !arenaState.isBettingPeriod ? 'not_in_betting_period' :
                    currentTime < bettingEndTime ? 'betting_period_ongoing' :
-                   arenaState.playerOneBetAddresses.length === 0 ? 'no_bets_yodha_one' :
-                   arenaState.playerTwoBetAddresses.length === 0 ? 'no_bets_yodha_two' : 'unknown',
+                   arenaState.playerOneBetAddresses.length === 0 ? 'no_bets_warriors_one' :
+                   arenaState.playerTwoBetAddresses.length === 0 ? 'no_bets_warriors_two' : 'unknown',
             bettingEndTime,
             currentTime
           };

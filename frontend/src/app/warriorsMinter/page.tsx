@@ -14,6 +14,7 @@ import { gameMasterSigningService } from '../../services/gameMasterSigning';
 import { ipfsService } from '../../services/ipfsService';
 import { chainsToContracts, warriorsNFTAbi } from '../../constants';
 import { useUserNFTs } from '../../hooks/useUserNFTs';
+import { useWarriorsMinterMessages } from '../../hooks/useWarriorsMinterMessages';
 
 interface WarriorsTraits {
   strength: number;
@@ -86,8 +87,6 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
 
   // Custom hook to manage user NFTs
   const { userNFTs, isLoadingNFTs, hasError: tokenIdsError, clearCache, debugState } = useUserNFTs(activeSection === 'manage', chainId);
-
-
 
   // Handle transaction confirmation and display success message
   useEffect(() => {
@@ -164,6 +163,13 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     }
 
     setIsGenerating(true);
+    
+    // Trigger warrior message
+    showMessage({
+      id: 'ai_start_generating',
+      text: "Hark! I call upon the ancient 0G AI spirits to forge thy warrior's essence! This may take a moment, Chief...",
+      duration: 5000
+    });
     
     try {
       // Call 0G AI service via API route
@@ -277,6 +283,13 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     setIsMinting(true);
     console.log('Starting Warriors NFT minting process...');
 
+    // Trigger warrior message for minting start
+    showMessage({
+      id: 'minting_start',
+      text: "By the old gods! Thy warrior shall be forged in the eternal blockchain! Prepare for battle, Chief!",
+      duration: 6000
+    });
+
     try {
       // Upload image and create JSON metadata on 0G Storage
       console.log('🚀 Uploading warrior data to 0G Storage...');
@@ -332,8 +345,23 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     }
   };
 
-  const isFormComplete = formData.name && formData.bio && formData.life_history && 
-                        formData.adjectives && formData.knowledge_areas && formData.image;
+  const isFormComplete = !!(formData.name && formData.bio && formData.life_history && 
+                        formData.adjectives && formData.knowledge_areas && formData.image);
+
+  // Warrior messages for engaging user experience  
+  const { showMessage } = useWarriorsMinterMessages({
+    isFormComplete: isFormComplete,
+    isMinting: isMinting,
+    isActivating: isActivating,
+    mintingSuccess: isConfirmed && isMinting,
+    mintingError: false, // Add error state tracking if needed
+    activationSuccess: isConfirmed && isActivating,
+    imageUploaded: !!formData.image,
+    aiGenerating: isGenerating,
+    aiSuccess: false, // Fixed this since generatedTraits doesn't exist
+    isLoadingWarriors: isLoadingNFTs,
+    activeSection: activeSection
+  });
 
   const getPromotionRequirement = (rank: string): number => {
     switch (rank) {
@@ -372,6 +400,13 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
     if (!warriors) return;
 
     setIsActivating(true);
+    
+    // Trigger warrior message for activation start
+    showMessage({
+      id: 'activation_start',
+      text: `Behold! The awakening ritual begins for ${warriors.name}! Soon they shall serve thee in the Arena, Chief!`,
+      duration: 5000
+    });
     
     try {
       // Create personality attributes object from warriors data
@@ -956,7 +991,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                 fontFamily: 'Press Start 2P, monospace'
               }}
             >
-              FORGE YOUR LEGENDARY WARRIORS WARRIOR
+              FORGE YOUR LEGENDARY WARRIORS NFTs
             </p>
           </div>
         </div>
@@ -1426,7 +1461,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                 className="text-2xl text-orange-400 mb-4 tracking-wider arcade-glow"
                 style={{fontFamily: 'Press Start 2P, monospace'}}
               >
-                YOUR WARRIORS WARRIORS
+                YOUR WARRIORS NFTs
               </h2>
               <p 
                 className="text-gray-300 text-sm"
@@ -1434,32 +1469,7 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
               >
                 MANAGE AND PROMOTE YOUR LEGENDARY FIGHTERS
               </p>
-              
-              {/* Debug tools (only show in development) */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-4 flex gap-2 justify-center">
-                  <button
-                    onClick={() => {
-                      clearCache();
-                      alert('0G Storage metadata cache cleared! Refresh will reload all NFT data.');
-                    }}
-                    className="px-4 py-2 bg-purple-600 border border-purple-400 text-purple-200 text-xs rounded-lg hover:bg-purple-700 transition-colors"
-                    style={{fontFamily: 'Press Start 2P, monospace'}}
-                  >
-                    🗑️ CLEAR CACHE
-                  </button>
-                  <button
-                    onClick={() => {
-                      debugState();
-                      alert('Check console for debug info!');
-                    }}
-                    className="px-4 py-2 bg-blue-600 border border-blue-400 text-blue-200 text-xs rounded-lg hover:bg-blue-700 transition-colors"
-                    style={{fontFamily: 'Press Start 2P, monospace'}}
-                  >
-                    🐛 DEBUG STATE
-                  </button>
-                </div>
-              )}
+            
               
               {!connectedAddress && (
                 <div className="mt-4 p-4 bg-red-900/50 border border-red-500 rounded-lg">
@@ -1732,20 +1742,9 @@ const WarriorsMinterPage = memo(function WarriorsMinterPage() {
                             onClick={() => handleActivateWarriors(selectedWarriors)}
                             disabled={isActivating}
                           >
-                            {isActivating ? '🔄 ACTIVATING...' : '🌟 ACTIVATE YODHA'}
+                            {isActivating ? 'ACTIVATING WARRIORS...' : 'ACTIVATE WARRIORS'}
                           </button>
                         </div>
-                      )}
-
-                      {/* Only show promotion info for active Warriorss */}
-                      {!isWarriorsInactive(selectedWarriors.traits) && selectedWarriors.rank !== 'platinum' && (
-                        <p 
-                          className="text-xs text-yellow-400 mb-4"
-                          style={{fontFamily: 'Press Start 2P, monospace'}}
-                        >
-                          NEXT RANK: {getNextRank(selectedWarriors.rank).toUpperCase()} 
-                          (REQUIRES {getPromotionRequirement(selectedWarriors.rank)} CRwN)
-                        </p>
                       )}
                     </div>
 

@@ -6,6 +6,7 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagm
 import { useState, useEffect } from 'react';
 import { parseEther } from 'viem';
 import { chainsToContracts, crownTokenAbi } from '../constants';
+import { useCRwNTokenMessages } from '../hooks/useCRwNTokenMessages';
 import './home-glass.css';
 
 // Token Exchange Card Component
@@ -37,6 +38,18 @@ const TokenExchangeCard = ({
     hash,
   });
 
+  // CRwN token messages for engaging user experience
+  const { showMessage } = useCRwNTokenMessages({
+    isMinting: type === 'mint' && isLoading,
+    mintSuccess: type === 'mint' && isConfirmed,
+    isBurning: type === 'burn' && isLoading,
+    burnSuccess: type === 'burn' && isConfirmed,
+    transactionPending: isConfirming,
+    transactionConfirmed: isConfirmed,
+    amount: amount,
+    operation: type
+  });
+
   // Get contract address for current chain
   const contractAddress = chainId ? chainsToContracts[chainId]?.crownToken : undefined;
 
@@ -44,6 +57,15 @@ const TokenExchangeCard = ({
     if (!amount || parseFloat(amount) <= 0 || !contractAddress || !address) return;
     
     setIsLoading(true);
+    
+    // Trigger warrior message for transaction start
+    showMessage({
+      id: `${type}_start`,
+      text: type === 'mint' 
+        ? `By the royal mint! Thy ${amount} FLOW shall be transformed into precious CRwN tokens!`
+        : `The fires of conversion ignite! Thy ${amount} CRwN tokens shall return to pure FLOW!`,
+      duration: 4000
+    });
     
     try {
       const amountInWei = parseEther(amount);

@@ -3,7 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { createWalletClient, http, createPublicClient, keccak256, encodePacked } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { defineChain } from 'viem';
-import { KurukshetraAbi, chainsToContracts } from '../../../constants';
+import { ArenaAbi, chainsToContracts } from '../../../constants';
 
 // Define Flow EVM chains
 const flowTestnet = defineChain({
@@ -108,7 +108,7 @@ async function executeStartGame(battleId: string) {
     
     const hash = await walletClient.writeContract({
       address: contractAddress as `0x${string}`,
-      abi: KurukshetraAbi,
+      abi: ArenaAbi,
       functionName: 'startGame',
       args: []
     });
@@ -160,7 +160,7 @@ async function executeBattle(battleId: string, move1: number, move2: number) {
     
     const hash = await walletClient.writeContract({
       address: contractAddress as `0x${string}`,
-      abi: KurukshetraAbi,
+      abi: ArenaAbi,
       functionName: 'battle',
       args: [move1, move2, signature]
     });
@@ -206,7 +206,7 @@ async function autoExecuteNextRound(battleId: string) {
     const contractAddress = battleId;
     const currentRound = await publicClient.readContract({
       address: contractAddress as `0x${string}`,
-      abi: KurukshetraAbi,
+      abi: ArenaAbi,
       functionName: 'getCurrentRound'
     });
 

@@ -1,5 +1,5 @@
 import { readContract, writeContract } from '@wagmi/core';
-import { chainsToContracts, crownTokenAbi, KurukshetraAbi } from '../constants';
+import { chainsToContracts, crownTokenAbi, ArenaAbi } from '../constants';
 import rainbowKitConfig from '../rainbowKitConfig';
 import { warriorsNFTService, type WarriorsDetails } from './warriorsNFTService';
 
@@ -140,7 +140,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'initializeGame',
         args: [BigInt(warriorsOneNFTId), BigInt(warriorsTwoNFTId)],
         chainId: 545,
@@ -181,110 +181,110 @@ export const arenaService = {
       ] = await Promise.all([
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getWarriorsOneNFTId',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getWarriorsTwoNFTId',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCurrentRound',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getInitializationStatus',
           chainId: 545,
         }),
         // Removed getBattleStatus - using new isBattleOngoing function instead
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getGameInitializedAt',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getLastRoundEndedAt',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getDamageOnWarriorsOne',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getDamageOnWarriorsTwo',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getBetAmount',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCostToInfluence',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCostToDefluence',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCostToInfluenceWarriorsOne',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCostToInfluenceWarriorsTwo',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCostToDefluenceWarriorsOne',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getCostToDefluenceWarriorsTwo',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getPlayerOneBetAddresses',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getPlayerTwoBetAddresses',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getMinWarriorsBettingPeriod',
           chainId: 545,
         })
@@ -353,7 +353,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'betOnWarriorsOne',
         args: [BigInt(multiplier)],
         chainId: 545,
@@ -373,7 +373,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'betOnWarriorsTwo',
         args: [BigInt(multiplier)],
         chainId: 545,
@@ -393,7 +393,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'startGame',
         chainId: 545,
       });
@@ -412,7 +412,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'influenceWarriorsOne',
         chainId: 545,
       });
@@ -431,7 +431,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'influenceWarriorsTwo',
         chainId: 545,
       });
@@ -450,7 +450,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'defluenceWarriorsOne',
         chainId: 545,
       });
@@ -469,7 +469,7 @@ export const arenaService = {
     try {
       const hash = await writeContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'defluenceWarriorsTwo',
         chainId: 545,
       });
@@ -484,7 +484,7 @@ export const arenaService = {
   /**
    * Bet on Warriors One
    * @param arenaAddress - The arena contract address
-   * @param betAmountInTokens - The bet amount in human-readable format (e.g., 6 for 6 RANN)
+   * @param betAmountInTokens - The bet amount in human-readable format (e.g., 6 for 6 CRwN)
    */
   async betOnWarriorsOneWithAmount(arenaAddress: string, betAmountInTokens: number): Promise<string> {
     try {
@@ -497,7 +497,7 @@ export const arenaService = {
       
       // Validate that the amount is a valid multiple
       if (multiplier < 1 || Math.abs(multiplier * baseBetAmount - betAmountInTokens) > 0.001) {
-        throw new Error(`Bet amount must be a multiple of ${baseBetAmount} RANN. Valid amounts: ${baseBetAmount}, ${baseBetAmount * 2}, ${baseBetAmount * 3}, etc.`);
+        throw new Error(`Bet amount must be a multiple of ${baseBetAmount} CRwN. Valid amounts: ${baseBetAmount}, ${baseBetAmount * 2}, ${baseBetAmount * 3}, etc.`);
       }
       
       return await this.betOnWarriorsOne(arenaAddress, multiplier);
@@ -510,7 +510,7 @@ export const arenaService = {
   /**
    * Bet on Warriors Two
    * @param arenaAddress - The arena contract address
-   * @param betAmountInTokens - The bet amount in human-readable format (e.g., 6 for 6 RANN)
+   * @param betAmountInTokens - The bet amount in human-readable format (e.g., 6 for 6 CRwN)
    */
   async betOnWarriorsTwoWithAmount(arenaAddress: string, betAmountInTokens: number): Promise<string> {
     try {
@@ -523,7 +523,7 @@ export const arenaService = {
       
       // Validate that the amount is a valid multiple
       if (multiplier < 1 || Math.abs(multiplier * baseBetAmount - betAmountInTokens) > 0.001) {
-        throw new Error(`Bet amount must be a multiple of ${baseBetAmount} RANN. Valid amounts: ${baseBetAmount}, ${baseBetAmount * 2}, ${baseBetAmount * 3}, etc.`);
+        throw new Error(`Bet amount must be a multiple of ${baseBetAmount} CRwN. Valid amounts: ${baseBetAmount}, ${baseBetAmount * 2}, ${baseBetAmount * 3}, etc.`);
       }
       
       return await this.betOnWarriorsTwo(arenaAddress, multiplier);
@@ -541,7 +541,7 @@ export const arenaService = {
     try {
       const isBettingPeriod = await readContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getIsBettingPeriodGoingOn',
         chainId: 545,
       });
@@ -561,7 +561,7 @@ export const arenaService = {
     try {
       const minBettingPeriod = await readContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getMinWarriorsBettingPeriod',
         chainId: 545,
       });
@@ -594,13 +594,13 @@ export const arenaService = {
       const [initializationStatus, isBettingPeriodGoingOn] = await Promise.all([
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getInitializationStatus',
           chainId: 545,
         }),
         readContract(rainbowKitConfig, {
           address: arenaAddress as `0x${string}`,
-          abi: KurukshetraAbi,
+          abi: ArenaAbi,
           functionName: 'getIsBettingPeriodGoingOn',
           chainId: 545,
         })
@@ -623,7 +623,7 @@ export const arenaService = {
     try {
       const result = await readContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getCurrentRound',
         chainId: 545,
       });
@@ -641,7 +641,7 @@ export const arenaService = {
     try {
       const result = await readContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getDamageOnWarriorsOne',
         chainId: 545,
       });
@@ -659,7 +659,7 @@ export const arenaService = {
     try {
       const result = await readContract(rainbowKitConfig, {
         address: arenaAddress as `0x${string}`,
-        abi: KurukshetraAbi,
+        abi: ArenaAbi,
         functionName: 'getDamageOnWarriorsTwo',
         chainId: 545,
       });

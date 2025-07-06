@@ -26,7 +26,7 @@ export const useArenaSync = (battleId: string | null) => {
     if (!battleId) return;
 
     try {
-      const response = await fetch(`/api/arena/status?battleId=${battleId}`);
+      const response = await fetch(`http://localhost:3002/api/arena/status?battleId=${battleId}`);
       if (response.ok) {
         const data = await response.json();
         // Handle both existing gameState and null gameState gracefully
@@ -58,7 +58,7 @@ export const useArenaSync = (battleId: string | null) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/arena/commands?battleId=${battleId}`, {
+      const response = await fetch(`http://localhost:3002/api/arena/commands?battleId=${battleId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +116,7 @@ export const useArenaSync = (battleId: string | null) => {
     if (!battleId) return;
 
     try {
-      await fetch(`/api/arena/commands?battleId=${battleId}`, {
+      await fetch(`http://localhost:3002/api/arena/commands?battleId=${battleId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

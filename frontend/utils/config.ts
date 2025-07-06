@@ -9,4 +9,4 @@
 // })
 
 // Note: This file is no longer used - Warriors NFT minting now uses 0G Storage
-console.log("⚠️  Pinata configuration deprecated - using 0G Storage instead");
+console.log("✅ Using 0G Storage for decentralized data storage");

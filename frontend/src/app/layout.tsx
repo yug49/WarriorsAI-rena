@@ -4,6 +4,8 @@ import {Providers} from "./providers";
 import {ReactNode} from "react";
 import Header from "../components/Header";
 import Footer from "@/components/Footer";
+import WarriorAssistant from "@/components/WarriorAssistant";
+import { WarriorMessageProvider } from "@/contexts/WarriorMessageContext";
 
 export const metadata: Metadata = {
   title: "WarriorsAI-rena",
@@ -23,9 +25,12 @@ export default function RootLayout(props: {children: ReactNode}) {
       </head>
       <body>
         <Providers>
-          <Header />
-          {props.children}
-          <Footer />
+          <WarriorMessageProvider>
+            <Header />
+            {props.children}
+            <Footer />
+            <WarriorAssistant />
+          </WarriorMessageProvider>
         </Providers>
       </body>
     </html>

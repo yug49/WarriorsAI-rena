@@ -118,7 +118,7 @@ body {
   border-color: #94a3b8;
 }
 
-/* White color for RANN token amount */
+/* White color for CRwN token amount */
 .arcade-card-slate .text-red-400:last-child {
   color: #ffffff !important;
 }
@@ -646,7 +646,7 @@ body {
   transform: scale(1.02) !important;
 }
 
-/* Kurukshetra Battle Arena Styles */
+/* Arena Battle Arena Styles */
 .battle-arena-bg {
   background: 
     radial-gradient(circle at 20% 20%, rgba(220, 20, 60, 0.15) 0%, transparent 50%),
@@ -1048,5 +1048,157 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Warrior Assistant Styles */
+.warrior-assistant {
+  position: fixed;
+  bottom: 0px;
+  left: 0px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.warrior-sprite {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  width: 336px;
+  height: 336px;
+  object-fit: contain;
+  filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.8));
+}
+
+.warrior-speech-bubble {
+  position: absolute;
+  bottom: 230px;
+  left: 140px;
+  transform: translateX(0);
+  margin-bottom: 15px;
+  min-width: 200px;
+  max-width: 250px;
+  pointer-events: auto;
+}
+
+.speech-bubble-content {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+  border: 2px solid #ffd700;
+  border-radius: 12px;
+  padding: 12px 16px;
+  position: relative;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(255, 215, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.pixelated-cloud-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.15) 2px, transparent 2px),
+    radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 20% 80%, rgba(255, 215, 0, 0.1) 3px, transparent 3px);
+  background-size: 8px 8px, 12px 12px, 6px 6px, 16px 16px;
+  opacity: 0.7;
+  animation: cloud-drift 3s ease-in-out infinite;
+}
+
+@keyframes cloud-drift {
+  0%, 100% {
+    background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%;
+  }
+  50% {
+    background-position: 8px 8px, -12px 12px, 6px -6px, 16px -16px;
+  }
+}
+
+.speech-bubble-text {
+  position: relative;
+  z-index: 10;
+  color: #ffd700;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  text-align: center;
+  text-shadow: 
+    1px 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 4px rgba(255, 215, 0, 0.4);
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 
+      1px 1px 2px rgba(0, 0, 0, 0.8),
+      0 0 4px rgba(255, 215, 0, 0.4);
+  }
+  50% {
+    text-shadow: 
+      1px 1px 2px rgba(0, 0, 0, 0.8),
+      0 0 8px rgba(255, 215, 0, 0.6),
+      0 0 12px rgba(255, 215, 0, 0.3);
+  }
+}
+
+.speech-bubble-tail {
+  position: absolute;
+  top: 100%;
+  left: 25px;
+  transform: translateX(0);
+}
+
+.speech-bubble-tail-border {
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid #ffd700;
+  position: relative;
+}
+
+.speech-bubble-tail-fill {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #1a1a1a;
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Warrior idle animation effects */
+.warrior-container {
+  animation: warrior-float 4s ease-in-out infinite;
+}
+
+@keyframes warrior-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Entrance animation */
+.warrior-entrance {
+  animation: warrior-entrance 0.8s ease-out;
+}
+
+@keyframes warrior-entrance {
+  0% {
+    opacity: 0;
+    transform: translateY(50px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
   }
 }

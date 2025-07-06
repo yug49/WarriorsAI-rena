@@ -241,7 +241,7 @@
 
 /* Specific override for "ENTER THE ULTIMATE BATTLEGROUND" text */
 .home-page .arcade-border p.text-yellow-400.metal-text {
-  color: #2d5a27 !important; /* Same dark green as main RANN heading */
+  color: #2d5a27 !important; /* Same dark green as main CRwN heading */
   text-shadow: 
     1px 1px 2px rgba(255, 255, 255, 0.8),
     0 0 3px rgba(255, 255, 255, 0.6) !important;
@@ -415,7 +415,7 @@
   border-color: #2d5a27 !important;
 }
 
-/* White color for RANN token amount on light theme */
+/* White color for CRwN token amount on light theme */
 .home-page .arcade-card-slate .text-red-400:last-child {
   color: #ffffff !important;
   text-shadow: 

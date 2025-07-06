@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { kurukshetraService, RankingArenas, Ranking } from '../services/kurukshetraService';
+import { arenaFactoryService, RankingArenas, Ranking } from '../services/arenaFactoryService';
 import { arenaService, type ArenaDetails } from '../services/arenaService';
 
 export type RankCategory = 'UNRANKED' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
@@ -70,7 +70,7 @@ export const useArenas = (): UseArenasReturn => {
       setError(null);
       
       // First, get all arena addresses by ranking
-      const arenas = await kurukshetraService.getAllArenasByRanking();
+      const arenas = await arenaFactoryService.getAllArenasByRanking();
       setArenasByRanking(arenas);
 
       // Then, fetch details for each arena in parallel (with some rate limiting)
@@ -169,7 +169,7 @@ export const useArenasForRanking = (ranking: RankCategory): {
       setError(null);
       
       const contractRanking = rankingMap[ranking];
-      const fetchedArenas = await kurukshetraService.getArenasOfRanking(contractRanking);
+      const fetchedArenas = await arenaFactoryService.getArenasOfRanking(contractRanking);
       setArenas(fetchedArenas);
     } catch (err) {
       console.error(`Error fetching arenas for ranking ${ranking}:`, err);
