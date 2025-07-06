@@ -349,8 +349,20 @@ Knowledge: ${Array.isArray(battlePrompt.agent_2.personality.knowledge_areas) ? b
 STATS: STR:${battlePrompt.agent_2.traits.Strength} | WIT:${battlePrompt.agent_2.traits.Wit} | CHA:${battlePrompt.agent_2.traits.Charisma} | DEF:${battlePrompt.agent_2.traits.Defence} | LUCK:${battlePrompt.agent_2.traits.Luck}
 CONDITION: ${battlePrompt.agent_2.total_damage_received > 70 ? 'CRITICAL' : battlePrompt.agent_2.total_damage_received > 40 ? 'MODERATE' : 'HEALTHY'} (${battlePrompt.agent_2.total_damage_received}/100 damage)
 
+GAME RULES:
+1. there are a total of 5 rounds
+
+2.There are 5 moves which are in game:
+ Strike: which generates damange and depends on strength
+ taunt: which generates influence (pumping up your warrior) and defluence(pumping down opponent) fees discounts  and which depends on wit and charisma
+ Special Move: which means damage and which depends on all 5 traits
+ Recover: means heal and it depends on damage and charisma 
+ Dodge: means not to be hit by other person in the next round and it depends on defence
+
+3. for the personality of agent we have knowledge and personality traits and the agent will have to STRICTLY personate the warrior and choose a move for the next round according to his personality only 
+
 🎯 STRATEGIC MOVE DECISION TREE 🎯
-FOR EACH WARRIOR, FOLLOW THIS LOGIC:
+FOR ANY WARRIOR, YOU CAN ALSO FOLLOW THIS LOGIC(ONLY IF IT DOES NOT CONTRADICT WITH THEIR PERSONALITY):
 
 1. SURVIVAL CHECK (Priority 1):
    - If damage > 70: MUST choose RECOVER or desperate SPECIAL_MOVE
